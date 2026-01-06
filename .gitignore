@@ -1,0 +1,31 @@
+# Compiled class files
+*.class
+target/
+
+# Log files
+*.log
+
+# Database files
+*.mv.db
+*.trace.db
+*.trace.db.old
+
+# Maven
+dependency-reduced-pom.xml
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# jqwik
+.jqwik-database
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.bak
+*~
