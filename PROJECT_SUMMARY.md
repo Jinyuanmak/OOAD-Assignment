@@ -34,7 +34,7 @@ A professional, production-ready parking facility management system with compreh
 - **Handicapped Pricing** - Special rates for handicapped vehicles
 - **Fine Management** - Automated fine generation and tracking
 - **Progressive Fine System** - Configurable fine strategies
-- **Database Persistence** - H2 embedded database
+- **Database Persistence** - MySQL database (via Laragon)
 - **Comprehensive Reporting** - Revenue, occupancy, vehicle, and fine reports
 
 ### ✓ Quality Assurance
@@ -73,7 +73,8 @@ DAO Layer (Database Access)
 |-----------|-----------|---------|
 | Language | Java | 11 |
 | GUI Framework | Swing | Built-in |
-| Database | H2 | 2.1.214 |
+| Database | MySQL | 8.0+ (Laragon) |
+| Database Tool | Laragon | Latest |
 | Build Tool | Maven | 3.9.12 |
 | Testing | JUnit 5 | 5.9.2 |
 | Property Testing | jqwik | 1.7.4 |
@@ -217,9 +218,9 @@ All 12 requirements from the specification are fully implemented:
 ### Deployment Package
 The `target/parking-lot-management.jar` file is a self-contained executable that includes:
 - All application code
-- H2 database driver
+- MySQL JDBC driver (mysql-connector-j)
 - All dependencies
-- No external files required (except Java runtime)
+- Requires: Java runtime + Laragon MySQL running
 
 ---
 
@@ -259,7 +260,7 @@ Potential improvements for future versions:
 **Institution:** University  
 **Year:** 2026
 
-**Technologies:** Java, Swing, H2 Database, Maven, JUnit, jqwik
+**Technologies:** Java, Swing, MySQL, JDBC, Laragon, Maven, JUnit, jqwik
 
 ---
 

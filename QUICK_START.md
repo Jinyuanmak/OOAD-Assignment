@@ -1,5 +1,17 @@
 # Quick Start Guide
 
+## Prerequisites
+
+### 1. Install Laragon (for MySQL)
+Download from: https://laragon.org/download/
+
+### 2. Start MySQL
+1. Open Laragon
+2. Click **"Start All"** button
+3. Wait for MySQL to show green indicator
+
+---
+
 ## Run the Application in 3 Steps
 
 ### Step 1: Start the Application
@@ -36,8 +48,9 @@ For technical details, see **README.md**
 ## System Requirements
 
 - Java 11 or higher
+- Laragon (with MySQL)
 - Windows operating system
-- 50 MB free disk space
+- 100 MB free disk space
 
 ---
 
@@ -45,15 +58,21 @@ For technical details, see **README.md**
 
 1. **Can't start the application?**
    - Check if Java is installed: `java -version`
-   - Make sure you're using `parking-lot-management.jar` (2.6 MB file)
+   - Make sure Laragon MySQL is running (green indicator)
 
-2. **Database errors?**
-   - Delete `parking_lot_db.mv.db` and restart
+2. **Database connection errors?**
+   - Start Laragon and click "Start All"
+   - Check MySQL is running on port 3306
 
-3. **Want to learn more?**
+3. **View database data?**
+   - Right-click Laragon > MySQL > phpMyAdmin
+   - Browse `parking_lot_db` database
+
+4. **Want to learn more?**
    - Read `USER_GUIDE.md` for complete instructions
    - Read `README.md` for technical documentation
+   - Read `DATABASE_TOOLS.md` for database details
 
 ---
 
-**Version:** 1.0.0
+**Version:** 1.0.1

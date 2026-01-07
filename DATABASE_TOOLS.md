@@ -1,60 +1,130 @@
 # Database Tools Used in Parking Lot Management System
 
-## Database: H2 Database ✅
+## Database: MySQL + JDBC with Laragon ✅
 
-This project uses **H2 Database** - a lightweight, embedded Java SQL database.
-
----
-
-## What is H2 Database?
-
-**H2** is a relational database management system written in Java. It can be:
-- Embedded in Java applications (what we use)
-- Run as a standalone server
-- Used for in-memory or file-based storage
-
-### Why H2?
-- ✅ **No installation required** - Just add the JAR dependency
-- ✅ **Embedded** - Runs inside the Java application
-- ✅ **Lightweight** - Small footprint (~2 MB)
-- ✅ **Fast** - Excellent performance for small to medium applications
-- ✅ **SQL Standard** - Supports standard SQL syntax
-- ✅ **JDBC Compatible** - Works with standard Java database APIs
-- ✅ **Persistent** - Data saved to file, survives application restart
+This project uses:
+- **MySQL Database** - Relational database management system
+- **JDBC (Java Database Connectivity)** - Standard Java API for database access
+- **Laragon** - Local development environment for MySQL
 
 ---
 
-## H2 Configuration
+## What is MySQL?
+
+**MySQL** is one of the most popular open-source relational database management systems. It is:
+- Fast and reliable
+- Widely used in production environments
+- Supports standard SQL syntax
+- ACID compliant
+
+## What is Laragon?
+
+**Laragon** is a portable, isolated, fast & powerful universal development environment for PHP, Node.js, Python, Java, Go, Ruby. It includes:
+- MySQL Server (default port: 3306)
+- Apache/Nginx web server
+- phpMyAdmin for database management
+- Easy to start/stop services
+
+## What is JDBC?
+
+**JDBC (Java Database Connectivity)** is the standard Java API for connecting to databases. It provides:
+- Database connections
+- SQL query execution
+- Result processing
+- Transaction management
+
+---
+
+## Prerequisites
+
+### 1. Install Laragon
+Download and install Laragon from: https://laragon.org/download/
+
+### 2. Start MySQL in Laragon
+1. Open Laragon
+2. Click "Start All" or right-click and select "MySQL > Start"
+3. MySQL will run on `localhost:3306`
+
+### 3. Default Laragon MySQL Credentials
+| Setting | Value |
+|---------|-------|
+| Host | localhost |
+| Port | 3306 |
+| Username | root |
+| Password | (empty - no password) |
+
+---
+
+## MySQL Configuration
 
 ### Maven Dependency (pom.xml)
 ```xml
 <dependency>
-    <groupId>com.h2database</groupId>
-    <artifactId>h2</artifactId>
-    <version>2.1.214</version>
+    <groupId>com.mysql</groupId>
+    <artifactId>mysql-connector-j</artifactId>
+    <version>8.0.33</version>
 </dependency>
 ```
 
-### Connection URL
+### JDBC Connection URL
 ```java
-jdbc:h2:./parking_lot_db;DB_CLOSE_DELAY=-1
+jdbc:mysql://localhost:3306/parking_lot_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
 ```
 
 **Breakdown:**
-- `jdbc:h2:` - JDBC driver for H2
-- `./parking_lot_db` - Database file in current directory
-- `DB_CLOSE_DELAY=-1` - Keep database open while application runs
+- `jdbc:mysql://` - JDBC driver for MySQL
+- `localhost:3306` - Laragon MySQL server address
+- `parking_lot_db` - Database name (auto-created)
+- `useSSL=false` - Disable SSL for local development
+- `serverTimezone=UTC` - Set timezone
+- `allowPublicKeyRetrieval=true` - Allow public key retrieval
 
-### Database File
+### Connection Settings in Code
+```java
+// DatabaseManager.java
+private static final String DEFAULT_DB_URL = "jdbc:mysql://localhost:3306/parking_lot_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true";
+private static final String DEFAULT_USER = "root";
+private static final String DEFAULT_PASSWORD = "";  // Laragon default: no password
 ```
-parking_lot_db.mv.db  (auto-created in project root)
+
+---
+
+## JDBC (Java Database Connectivity)
+
+### JDBC Classes Used
+All JDBC classes are from the `java.sql` package:
+
+| JDBC Class | Purpose | Used In |
+|------------|---------|---------|
+| `Connection` | Database connection object | All DAO classes |
+| `DriverManager` | Creates database connections | DatabaseManager.java |
+| `PreparedStatement` | Parameterized SQL queries (prevents SQL injection) | All DAO classes |
+| `Statement` | Basic SQL statement execution | DatabaseManager.java |
+| `ResultSet` | Holds query results | All DAO classes |
+| `SQLException` | Database error handling | All DAO classes |
+| `Timestamp` | Date/time values for database | VehicleDAO, FineDAO, PaymentDAO |
+
+### JDBC Import Statements
+```java
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.sql.Timestamp;
 ```
 
 ---
 
 ## Database Schema
 
-### Tables Created
+### Database Name
+```
+parking_lot_db
+```
+
+### Tables (7 tables with InnoDB engine)
 
 | Table | Purpose |
 |-------|---------|
@@ -66,33 +136,33 @@ parking_lot_db.mv.db  (auto-created in project root)
 | `fines` | Fine records |
 | `payments` | Payment transactions |
 
-### Table Definitions
+### Table Definitions (MySQL Syntax)
 
 #### 1. parking_lots
 ```sql
-CREATE TABLE parking_lots (
+CREATE TABLE IF NOT EXISTS parking_lots (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     total_floors INT NOT NULL DEFAULT 0,
     total_revenue DECIMAL(10,2) NOT NULL DEFAULT 0.00,
     current_fine_strategy VARCHAR(50) DEFAULT 'FIXED'
-);
+) ENGINE=InnoDB;
 ```
 
 #### 2. floors
 ```sql
-CREATE TABLE floors (
+CREATE TABLE IF NOT EXISTS floors (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     parking_lot_id BIGINT NOT NULL,
     floor_number INT NOT NULL,
     total_spots INT NOT NULL DEFAULT 0,
     FOREIGN KEY (parking_lot_id) REFERENCES parking_lots(id)
-);
+) ENGINE=InnoDB;
 ```
 
 #### 3. parking_spots
 ```sql
-CREATE TABLE parking_spots (
+CREATE TABLE IF NOT EXISTS parking_spots (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     floor_id BIGINT NOT NULL,
     spot_id VARCHAR(50) NOT NULL UNIQUE,
@@ -101,136 +171,196 @@ CREATE TABLE parking_spots (
     status VARCHAR(20) NOT NULL DEFAULT 'AVAILABLE',
     current_vehicle_id BIGINT,
     FOREIGN KEY (floor_id) REFERENCES floors(id)
-);
+) ENGINE=InnoDB;
 ```
 
 #### 4. vehicles
 ```sql
-CREATE TABLE vehicles (
+CREATE TABLE IF NOT EXISTS vehicles (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     license_plate VARCHAR(20) NOT NULL,
     vehicle_type VARCHAR(20) NOT NULL,
     is_handicapped BOOLEAN NOT NULL DEFAULT FALSE,
-    entry_time TIMESTAMP,
-    exit_time TIMESTAMP,
+    entry_time DATETIME,
+    exit_time DATETIME,
     assigned_spot_id VARCHAR(50)
-);
+) ENGINE=InnoDB;
 ```
 
 #### 5. parking_sessions
 ```sql
-CREATE TABLE parking_sessions (
+CREATE TABLE IF NOT EXISTS parking_sessions (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     vehicle_id BIGINT NOT NULL,
     spot_id VARCHAR(50) NOT NULL,
-    entry_time TIMESTAMP NOT NULL,
-    exit_time TIMESTAMP,
+    entry_time DATETIME NOT NULL,
+    exit_time DATETIME,
     duration_hours INT,
     ticket_number VARCHAR(100) NOT NULL UNIQUE,
     FOREIGN KEY (vehicle_id) REFERENCES vehicles(id)
-);
+) ENGINE=InnoDB;
 ```
 
 #### 6. fines
 ```sql
-CREATE TABLE fines (
+CREATE TABLE IF NOT EXISTS fines (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     license_plate VARCHAR(20) NOT NULL,
     fine_type VARCHAR(30) NOT NULL,
     amount DECIMAL(10,2) NOT NULL,
-    issued_date TIMESTAMP NOT NULL,
+    issued_date DATETIME NOT NULL,
     is_paid BOOLEAN NOT NULL DEFAULT FALSE,
     parking_session_id BIGINT,
     FOREIGN KEY (parking_session_id) REFERENCES parking_sessions(id)
-);
+) ENGINE=InnoDB;
 ```
 
 #### 7. payments
 ```sql
-CREATE TABLE payments (
+CREATE TABLE IF NOT EXISTS payments (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     license_plate VARCHAR(20) NOT NULL,
     parking_fee DECIMAL(10,2) NOT NULL,
     fine_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
     total_amount DECIMAL(10,2) NOT NULL,
     payment_method VARCHAR(20) NOT NULL,
-    payment_date TIMESTAMP NOT NULL,
+    payment_date DATETIME NOT NULL,
     parking_session_id BIGINT,
     FOREIGN KEY (parking_session_id) REFERENCES parking_sessions(id)
-);
+) ENGINE=InnoDB;
 ```
 
 ---
 
-## Data Access Layer (DAO)
+## Data Access Layer (DAO) with JDBC
 
 ### DAO Classes Location
 ```
 src/main/java/com/university/parking/dao/
 ```
 
-### DAO Files
+### DAO Files (All Use JDBC)
 
-| File | Purpose |
-|------|---------|
-| **DatabaseManager.java** | Connection pooling, schema initialization |
-| **VehicleDAO.java** | Vehicle CRUD operations |
-| **ParkingSpotDAO.java** | Parking spot operations |
-| **FineDAO.java** | Fine management |
-| **PaymentDAO.java** | Payment records |
+| File | Purpose | JDBC Classes Used |
+|------|---------|-------------------|
+| **DatabaseManager.java** | Connection pooling, schema initialization | Connection, DriverManager, Statement |
+| **VehicleDAO.java** | Vehicle CRUD operations | Connection, PreparedStatement, ResultSet, Timestamp |
+| **ParkingSpotDAO.java** | Parking spot operations | Connection, PreparedStatement, ResultSet |
+| **FineDAO.java** | Fine management | Connection, PreparedStatement, ResultSet, Timestamp |
+| **PaymentDAO.java** | Payment records | Connection, PreparedStatement, ResultSet, Timestamp |
 
 ---
 
-## How Database is Used
+## JDBC Code Examples
 
-### 1. DatabaseManager.java
-Manages database connections and initializes schema:
+### 1. DatabaseManager.java - Creating MySQL Connection
 ```java
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+
 public class DatabaseManager {
-    private static final String DEFAULT_DB_URL = "jdbc:h2:./parking_lot_db;DB_CLOSE_DELAY=-1";
+    private static final String DB_URL = "jdbc:mysql://localhost:3306/parking_lot_db?useSSL=false&serverTimezone=UTC";
+    private static final String USER = "root";
+    private static final String PASSWORD = "";
     
-    public void initializeDatabase() throws SQLException {
-        initializeConnectionPool();
-        createTables();
-    }
-    
-    public Connection getConnection() throws SQLException {
-        return connectionPool.take();
+    private Connection createConnection() throws SQLException {
+        return DriverManager.getConnection(DB_URL, USER, PASSWORD);
     }
 }
 ```
 
-### 2. VehicleDAO.java
-Handles vehicle database operations:
+### 2. Creating Database (MySQL Specific)
 ```java
-public class VehicleDAO {
-    public void save(Vehicle vehicle) throws SQLException {
-        String sql = "INSERT INTO vehicles (license_plate, vehicle_type, ...) VALUES (?, ?, ...)";
-        // Execute SQL
-    }
-    
-    public Vehicle findByLicensePlate(String plate) throws SQLException {
-        String sql = "SELECT * FROM vehicles WHERE license_plate = ?";
-        // Execute query and return vehicle
+private void createDatabaseIfNotExists() throws SQLException {
+    String baseUrl = "jdbc:mysql://localhost:3306?useSSL=false&serverTimezone=UTC";
+    try (Connection conn = DriverManager.getConnection(baseUrl, user, password);
+         Statement stmt = conn.createStatement()) {
+        stmt.execute("CREATE DATABASE IF NOT EXISTS parking_lot_db");
     }
 }
 ```
 
-### 3. FineDAO.java
-Manages fine records:
+### 3. INSERT with PreparedStatement
 ```java
-public class FineDAO {
-    public void save(Fine fine) throws SQLException {
-        String sql = "INSERT INTO fines (license_plate, fine_type, amount, ...) VALUES (?, ?, ?, ...)";
-        // Execute SQL
-    }
+public Long save(Vehicle vehicle) throws SQLException {
+    String sql = "INSERT INTO vehicles (license_plate, vehicle_type, is_handicapped, entry_time) " +
+                 "VALUES (?, ?, ?, ?)";
     
-    public List<Fine> findUnpaidByLicensePlate(String plate) throws SQLException {
-        String sql = "SELECT * FROM fines WHERE license_plate = ? AND is_paid = FALSE";
-        // Execute query and return fines
+    Connection conn = dbManager.getConnection();
+    try (PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+        stmt.setString(1, vehicle.getLicensePlate());
+        stmt.setString(2, vehicle.getType().name());
+        stmt.setBoolean(3, vehicle.isHandicapped());
+        stmt.setTimestamp(4, Timestamp.valueOf(vehicle.getEntryTime()));
+        
+        stmt.executeUpdate();
+        
+        try (ResultSet rs = stmt.getGeneratedKeys()) {
+            if (rs.next()) {
+                return rs.getLong(1);
+            }
+        }
+    } finally {
+        dbManager.releaseConnection(conn);
     }
+    return null;
 }
 ```
+
+### 4. SELECT with ResultSet
+```java
+public Vehicle findByLicensePlate(String licensePlate) throws SQLException {
+    String sql = "SELECT * FROM vehicles WHERE license_plate = ?";
+    
+    Connection conn = dbManager.getConnection();
+    try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+        stmt.setString(1, licensePlate);
+        
+        try (ResultSet rs = stmt.executeQuery()) {
+            if (rs.next()) {
+                return mapResultSetToVehicle(rs);
+            }
+        }
+    } finally {
+        dbManager.releaseConnection(conn);
+    }
+    return null;
+}
+```
+
+---
+
+## How to Use with Laragon
+
+### Step 1: Start Laragon
+1. Open Laragon application
+2. Click "Start All" button
+3. Wait for MySQL to start (green indicator)
+
+### Step 2: Run the Application
+```
+Double-click: run-parking-system.bat
+```
+
+### Step 3: Verify Database
+1. Open phpMyAdmin in Laragon (right-click > MySQL > phpMyAdmin)
+2. Look for `parking_lot_db` database
+3. Check that all 7 tables are created
+
+---
+
+## Viewing Data in phpMyAdmin
+
+### Access phpMyAdmin
+1. Right-click Laragon tray icon
+2. Select "MySQL" > "phpMyAdmin"
+3. Or open browser: http://localhost/phpmyadmin
+
+### View Tables
+1. Click on `parking_lot_db` database
+2. Browse tables: vehicles, parking_spots, fines, payments, etc.
+3. Run SQL queries directly
 
 ---
 
@@ -242,22 +372,16 @@ The system implements connection pooling for efficient database access:
 private final BlockingQueue<Connection> connectionPool;
 private static final int DEFAULT_POOL_SIZE = 10;
 
-private void initializeConnectionPool() throws SQLException {
-    for (int i = 0; i < poolSize; i++) {
-        connectionPool.offer(createConnection());
-    }
-}
-
 public Connection getConnection() throws SQLException {
-    try {
-        return connectionPool.take();
-    } catch (InterruptedException e) {
-        throw new SQLException("Interrupted while waiting for connection", e);
+    Connection conn = connectionPool.poll();
+    if (conn == null || conn.isClosed()) {
+        return createConnection();
     }
+    return conn;
 }
 
 public void releaseConnection(Connection conn) {
-    if (conn != null) {
+    if (conn != null && !conn.isClosed()) {
         connectionPool.offer(conn);
     }
 }
@@ -265,55 +389,24 @@ public void releaseConnection(Connection conn) {
 
 ---
 
-## Database Features Used
+## Troubleshooting
 
-### SQL Features
-- ✅ **CREATE TABLE** - Schema creation
-- ✅ **INSERT** - Adding records
-- ✅ **SELECT** - Querying data
-- ✅ **UPDATE** - Modifying records
-- ✅ **DELETE** - Removing records
-- ✅ **Foreign Keys** - Referential integrity
-- ✅ **AUTO_INCREMENT** - Auto-generated IDs
-- ✅ **Timestamps** - Date/time tracking
+### "Communications link failure"
+- Make sure Laragon is running
+- Check MySQL is started (green indicator in Laragon)
+- Verify port 3306 is not blocked
 
-### JDBC Features
-- ✅ **PreparedStatement** - Parameterized queries (SQL injection prevention)
-- ✅ **ResultSet** - Query results processing
-- ✅ **Connection pooling** - Efficient connection management
-- ✅ **Transaction support** - Data integrity
+### "Access denied for user 'root'"
+- Laragon default has no password for root
+- If you set a password, update `DEFAULT_PASSWORD` in DatabaseManager.java
 
----
+### "Unknown database 'parking_lot_db'"
+- The application auto-creates the database
+- Or manually create: `CREATE DATABASE parking_lot_db;`
 
-## Data Persistence
-
-### What Gets Saved
-- ✅ Vehicle entry/exit records
-- ✅ Parking spot status
-- ✅ Payment transactions
-- ✅ Fine records (including unpaid balances)
-- ✅ Revenue totals
-
-### Persistence Across Sessions
-When you restart the application:
-- All parked vehicles are remembered
-- Unpaid fines persist
-- Payment history is preserved
-- Revenue totals are maintained
-
----
-
-## Database File Location
-
-```
-Project Root/
-├── parking_lot_db.mv.db      ← Main database file
-├── parking_lot_db.trace.db   ← Trace/log file (optional)
-└── ...
-```
-
-### To Reset Database
-Delete `parking_lot_db.mv.db` and restart the application. A fresh database will be created automatically.
+### "Table doesn't exist"
+- Run the application once to create tables
+- Or run the CREATE TABLE statements manually in phpMyAdmin
 
 ---
 
@@ -321,30 +414,37 @@ Delete `parking_lot_db.mv.db` and restart the application. A fresh database will
 
 | Aspect | Details |
 |--------|---------|
-| **Database** | H2 Database |
-| **Version** | 2.1.214 |
-| **Type** | Embedded, File-based |
-| **Connection** | JDBC |
-| **Tables** | 7 tables |
-| **DAO Classes** | 5 classes |
+| **Database** | MySQL |
+| **Version** | 8.0+ (via Laragon) |
+| **Development Tool** | Laragon |
+| **Connection API** | JDBC (Java Database Connectivity) |
+| **JDBC Driver** | mysql-connector-j 8.0.33 |
+| **Host** | localhost |
+| **Port** | 3306 |
+| **Username** | root |
+| **Password** | (empty) |
+| **Database Name** | parking_lot_db |
+| **Tables** | 7 tables (InnoDB engine) |
+| **DAO Classes** | 5 classes (all using JDBC) |
 | **Connection Pool** | 10 connections |
-| **File** | parking_lot_db.mv.db |
 
 ---
 
-## Why H2 for This Project?
+## Why MySQL + Laragon for This Project?
 
-1. **No Setup Required** - Works out of the box
-2. **Portable** - Database file travels with the application
-3. **Java Native** - Perfect integration with Java/Swing
-4. **SQL Standard** - Easy to understand and maintain
-5. **Lightweight** - Minimal resource usage
-6. **Reliable** - ACID compliant transactions
+1. **Industry Standard** - MySQL is widely used in production
+2. **Easy Setup** - Laragon provides one-click MySQL installation
+3. **phpMyAdmin** - Visual database management included
+4. **JDBC Compatible** - Standard Java database connectivity
+5. **Reliable** - ACID compliant with InnoDB engine
+6. **Scalable** - Can handle large amounts of data
+7. **Free** - Open source and free to use
 
 ---
 
 ## References
 
-- H2 Database Official: https://www.h2database.com/
-- H2 Maven: https://mvnrepository.com/artifact/com.h2database/h2
+- MySQL Official: https://www.mysql.com/
+- Laragon: https://laragon.org/
+- MySQL Connector/J: https://dev.mysql.com/downloads/connector/j/
 - JDBC Tutorial: https://docs.oracle.com/javase/tutorial/jdbc/

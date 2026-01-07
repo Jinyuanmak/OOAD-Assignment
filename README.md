@@ -123,29 +123,57 @@ Admin can select any scheme from the Admin Panel. The selected scheme applies to
 
 ## Database Technology
 
-**H2 Database - Embedded Java SQL Database**
+**MySQL Database + JDBC with Laragon**
 
-### Why H2?
-- ✅ No installation required - embedded in the application
-- ✅ Lightweight (~2 MB) and fast
-- ✅ Data persists to file across sessions
-- ✅ Standard SQL syntax
-- ✅ JDBC compatible
+### Database: MySQL
+- Industry-standard relational database
+- Managed via Laragon local development environment
+- Uses InnoDB storage engine
+
+### Connection: JDBC
+- Standard Java database API
+- MySQL Connector/J driver
+- Connection pooling for efficiency
+
+### Prerequisites
+1. **Install Laragon** from https://laragon.org/download/
+2. **Start MySQL** in Laragon (click "Start All")
+3. MySQL runs on `localhost:3306`
+
+### Laragon MySQL Credentials
+| Setting | Value |
+|---------|-------|
+| Host | localhost |
+| Port | 3306 |
+| Username | root |
+| Password | (empty) |
 
 ### Configuration
 ```xml
 <!-- Maven Dependency (pom.xml) -->
 <dependency>
-    <groupId>com.h2database</groupId>
-    <artifactId>h2</artifactId>
-    <version>2.1.214</version>
+    <groupId>com.mysql</groupId>
+    <artifactId>mysql-connector-j</artifactId>
+    <version>8.0.33</version>
 </dependency>
 ```
 
 ```java
-// Connection URL
-jdbc:h2:./parking_lot_db;DB_CLOSE_DELAY=-1
+// JDBC Connection URL
+jdbc:mysql://localhost:3306/parking_lot_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
 ```
+
+### JDBC Classes Used
+All from `java.sql` package:
+| JDBC Class | Purpose |
+|------------|---------|
+| `Connection` | Database connection |
+| `DriverManager` | Creates connections |
+| `PreparedStatement` | Parameterized SQL queries (prevents SQL injection) |
+| `Statement` | SQL statement execution |
+| `ResultSet` | Query results |
+| `SQLException` | Database error handling |
+| `Timestamp` | Date/time values |
 
 ### Database Tables (7 tables)
 | Table | Purpose |
@@ -162,25 +190,24 @@ jdbc:h2:./parking_lot_db;DB_CLOSE_DELAY=-1
 Located in `src/main/java/com/university/parking/dao/`:
 | File | Purpose |
 |------|---------|
-| **DatabaseManager.java** | Connection pooling (10 connections), schema initialization |
-| **VehicleDAO.java** | Vehicle CRUD operations |
-| **ParkingSpotDAO.java** | Parking spot operations |
-| **FineDAO.java** | Fine management |
-| **PaymentDAO.java** | Payment records |
+| **DatabaseManager.java** | JDBC connection pooling, MySQL schema initialization |
+| **VehicleDAO.java** | Vehicle CRUD operations using JDBC |
+| **ParkingSpotDAO.java** | Parking spot operations using JDBC |
+| **FineDAO.java** | Fine management using JDBC |
+| **PaymentDAO.java** | Payment records using JDBC |
 
 ### Database Features
-- ✅ Connection pooling for efficient access
-- ✅ Prepared statements (SQL injection prevention)
+- ✅ JDBC Connection pooling (10 connections)
+- ✅ PreparedStatement (SQL injection prevention)
 - ✅ Foreign key relationships
-- ✅ ACID transactions
+- ✅ InnoDB engine (ACID transactions)
 - ✅ Auto-generated IDs
+- ✅ Auto-creates database if not exists
 
-### Database File
-```
-parking_lot_db.mv.db  (auto-created in project root)
-```
-
-**To reset database:** Delete `parking_lot_db.mv.db` and restart the application.
+### View Data in phpMyAdmin
+1. Right-click Laragon tray icon
+2. Select "MySQL" > "phpMyAdmin"
+3. Browse `parking_lot_db` database
 
 See `DATABASE_TOOLS.md` for complete database documentation.
 
@@ -275,18 +302,23 @@ Modify `FineCalculationContext` to change fine calculation:
 
 ## Troubleshooting
 
-### "No suitable driver found for jdbc:h2"
-- Ensure you're running `parking-lot-management.jar` (2.6 MB), not `parking-lot-management-1.0.0.jar`
-- Use `run-parking-system.bat` which uses the correct JAR
+### "Communications link failure" or "Connection refused"
+- Make sure Laragon is running
+- Check MySQL is started (green indicator in Laragon)
+- Verify port 3306 is not blocked by firewall
 
-### Database Errors
-- Delete `parking_lot_db.mv.db` and restart
-- Check write permissions in project directory
+### "Access denied for user 'root'"
+- Laragon default has no password for root
+- If you set a password, update `DEFAULT_PASSWORD` in DatabaseManager.java
+
+### "Unknown database 'parking_lot_db'"
+- The application auto-creates the database on first run
+- Or manually create via phpMyAdmin: `CREATE DATABASE parking_lot_db;`
 
 ### Application Won't Start
 - Verify Java 11+ is installed: `java -version`
+- Ensure Laragon MySQL is running
 - Check console for error messages
-- Ensure no other instance is running
 
 ## Technical Details
 
@@ -298,11 +330,19 @@ Modify `FineCalculationContext` to change fine calculation:
   - JButton, JLabel, JTextArea for user interaction
   - JOptionPane for dialogs and messages
   - See `JAVA_SWING_USAGE.md` for complete component list
-- **H2 Database 2.1.214** - Embedded SQL database
-  - File-based persistence (`parking_lot_db.mv.db`)
-  - JDBC connection with connection pooling
-  - 7 database tables with foreign key relationships
+- **MySQL Database** - Relational database (via Laragon)
+  - Industry-standard database server
+  - 7 database tables with InnoDB engine
+  - Managed via Laragon local development environment
   - See `DATABASE_TOOLS.md` for complete database documentation
+- **JDBC (Java Database Connectivity)** - Database access API
+  - MySQL Connector/J 8.0.33 driver
+  - Connection, PreparedStatement, ResultSet from `java.sql` package
+  - Connection pooling (10 connections)
+  - Parameterized queries for SQL injection prevention
+- **Laragon** - Local development environment
+  - Provides MySQL server on localhost:3306
+  - Includes phpMyAdmin for database management
 - **Maven 3.9.12** - Build and dependency management
 - **JUnit 5** - Unit testing
 - **jqwik 1.7.4** - Property-based testing

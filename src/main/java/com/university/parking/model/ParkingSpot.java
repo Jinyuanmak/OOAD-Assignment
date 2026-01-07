@@ -40,6 +40,16 @@ public class ParkingSpot {
     }
 
     /**
+     * Assigns a vehicle to this spot (used when loading from database).
+     * Does not check availability status.
+     * @param vehicle the vehicle to assign to this spot
+     */
+    public void assignVehicle(Vehicle vehicle) {
+        this.currentVehicle = vehicle;
+        this.status = SpotStatus.OCCUPIED;
+    }
+
+    /**
      * Vacates the spot, making it available again.
      */
     public void vacateSpot() {

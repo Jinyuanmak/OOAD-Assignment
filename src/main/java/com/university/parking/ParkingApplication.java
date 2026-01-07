@@ -8,8 +8,10 @@ import javax.swing.SwingUtilities;
 
 import com.university.parking.dao.DatabaseManager;
 import com.university.parking.dao.FineDAO;
+import com.university.parking.dao.ParkingLotDAO;
 import com.university.parking.model.Floor;
 import com.university.parking.model.ParkingLot;
+import com.university.parking.model.ParkingSpot;
 import com.university.parking.model.SpotType;
 import com.university.parking.view.MainFrame;
 
@@ -35,17 +37,25 @@ public class ParkingApplication {
             // Continue without database - application will work in memory-only mode
         }
         
-        // Initialize parking lot with default configuration
-        ParkingLot parkingLot = createDefaultParkingLot();
+        // Load parking lot from database or create default
+        ParkingLot parkingLot = null;
+        try {
+            parkingLot = loadOrCreateParkingLot(dbManager);
+        } catch (SQLException e) {
+            System.err.println("Error loading parking lot from database: " + e.getMessage());
+            System.err.println("Creating default parking lot in memory...");
+            parkingLot = createDefaultParkingLot();
+        }
 
         // Make database manager and fineDAO final for lambda
         final DatabaseManager finalDbManager = dbManager;
         final FineDAO finalFineDAO = fineDAO;
+        final ParkingLot finalParkingLot = parkingLot;
         
         // Launch GUI on Event Dispatch Thread
         SwingUtilities.invokeLater(() -> {
             try {
-                MainFrame mainFrame = new MainFrame(parkingLot, finalDbManager, finalFineDAO);
+                MainFrame mainFrame = new MainFrame(finalParkingLot, finalDbManager, finalFineDAO);
                 mainFrame.setVisible(true);
                 
                 // Add shutdown hook to close database connections
@@ -64,6 +74,49 @@ public class ParkingApplication {
                 System.exit(1);
             }
         });
+    }
+
+    /**
+     * Loads parking lot from database or creates default if none exists.
+     * @param dbManager the database manager
+     * @return the parking lot (loaded or newly created)
+     * @throws SQLException if database operation fails
+     */
+    private static ParkingLot loadOrCreateParkingLot(DatabaseManager dbManager) throws SQLException {
+        if (dbManager == null) {
+            System.out.println("No database connection. Creating default parking lot in memory...");
+            return createDefaultParkingLot();
+        }
+        
+        ParkingLotDAO parkingLotDAO = new ParkingLotDAO(dbManager);
+        
+        // Try to load existing parking lot
+        if (parkingLotDAO.parkingLotExists()) {
+            System.out.println("Loading existing parking lot from database...");
+            ParkingLot parkingLot = parkingLotDAO.loadParkingLot();
+            System.out.println("Loaded parking lot: " + parkingLot.getName() + 
+                             " with " + parkingLot.getFloors().size() + " floors");
+            
+            // Count active vehicles
+            int activeVehicles = 0;
+            for (Floor floor : parkingLot.getFloors()) {
+                for (ParkingSpot spot : floor.getAllSpots()) {
+                    if (spot.getCurrentVehicle() != null) {
+                        activeVehicles++;
+                    }
+                }
+            }
+            System.out.println("Restored " + activeVehicles + " active parking sessions");
+            
+            return parkingLot;
+        }
+        
+        // First run - create default and save
+        System.out.println("First run detected. Creating default parking lot...");
+        ParkingLot parkingLot = createDefaultParkingLot();
+        parkingLotDAO.saveParkingLot(parkingLot);
+        System.out.println("Default parking lot saved to database");
+        return parkingLot;
     }
 
     /**

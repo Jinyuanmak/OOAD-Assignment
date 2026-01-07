@@ -1,9 +1,12 @@
 package com.university.parking.util;
 
+import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
 
 import com.university.parking.dao.DatabaseManager;
 import com.university.parking.dao.FineDAO;
@@ -24,6 +27,22 @@ import net.jqwik.api.constraints.IntRange;
  * Validates: Requirements 5.1, 5.2, 5.5
  */
 public class FineGenerationRulesProperties {
+    
+    private DatabaseManager dbManager;
+    
+    @BeforeEach
+    void setUp() throws SQLException {
+        dbManager = TestDatabaseConfig.createTestDatabaseManager();
+        TestDatabaseConfig.cleanDatabase(dbManager);
+    }
+    
+    @AfterEach
+    void tearDown() throws SQLException {
+        if (dbManager != null) {
+            TestDatabaseConfig.cleanDatabase(dbManager);
+            dbManager.shutdown();
+        }
+    }
 
     /**
      * Property 7: Fine Generation Rules
@@ -35,7 +54,6 @@ public class FineGenerationRulesProperties {
             @ForAll @IntRange(min = 25, max = 168) int hoursParked,
             @ForAll VehicleType vehicleType
     ) {
-        DatabaseManager dbManager = new DatabaseManager();
         FineDAO fineDAO = new FineDAO(dbManager);
         FineManager fineManager = new FineManager(fineDAO);
 
@@ -61,7 +79,6 @@ public class FineGenerationRulesProperties {
             @ForAll @IntRange(min = 1, max = 24) int hoursParked,
             @ForAll VehicleType vehicleType
     ) {
-        DatabaseManager dbManager = new DatabaseManager();
         FineDAO fineDAO = new FineDAO(dbManager);
         FineManager fineManager = new FineManager(fineDAO);
 
@@ -82,7 +99,6 @@ public class FineGenerationRulesProperties {
     void unauthorizedVehicleInReservedSpotShouldGenerateFine(
             @ForAll VehicleType vehicleType
     ) {
-        DatabaseManager dbManager = new DatabaseManager();
         FineDAO fineDAO = new FineDAO(dbManager);
         FineManager fineManager = new FineManager(fineDAO);
 
@@ -105,7 +121,6 @@ public class FineGenerationRulesProperties {
     void authorizedVehicleInReservedSpotShouldNotGenerateFine(
             @ForAll VehicleType vehicleType
     ) {
-        DatabaseManager dbManager = new DatabaseManager();
         FineDAO fineDAO = new FineDAO(dbManager);
         FineManager fineManager = new FineManager(fineDAO);
 
@@ -124,7 +139,6 @@ public class FineGenerationRulesProperties {
     void vehicleInNonReservedSpotShouldNotGenerateUnauthorizedFine(
             @ForAll VehicleType vehicleType
     ) {
-        DatabaseManager dbManager = new DatabaseManager();
         FineDAO fineDAO = new FineDAO(dbManager);
         FineManager fineManager = new FineManager(fineDAO);
 
@@ -148,7 +162,6 @@ public class FineGenerationRulesProperties {
             @ForAll @IntRange(min = 25, max = 168) int hoursParked,
             @ForAll VehicleType vehicleType
     ) {
-        DatabaseManager dbManager = new DatabaseManager();
         FineDAO fineDAO = new FineDAO(dbManager);
         FineManager fineManager = new FineManager(fineDAO);
 

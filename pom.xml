@@ -24,11 +24,11 @@
     <dependencies>
         <!-- Java Swing is part of JDK, no additional dependency needed -->
         
-        <!-- Database -->
+        <!-- Database - MySQL Connector -->
         <dependency>
-            <groupId>com.h2database</groupId>
-            <artifactId>h2</artifactId>
-            <version>2.1.214</version>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+            <version>8.0.33</version>
         </dependency>
 
         <!-- Testing -->

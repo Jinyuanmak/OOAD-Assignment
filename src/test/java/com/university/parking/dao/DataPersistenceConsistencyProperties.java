@@ -5,6 +5,9 @@ import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+
 import com.university.parking.model.Fine;
 import com.university.parking.model.FineType;
 import com.university.parking.model.ParkingSpot;
@@ -14,6 +17,7 @@ import com.university.parking.model.SpotStatus;
 import com.university.parking.model.SpotType;
 import com.university.parking.model.Vehicle;
 import com.university.parking.model.VehicleType;
+import com.university.parking.util.TestDatabaseConfig;
 
 import net.jqwik.api.Arbitraries;
 import net.jqwik.api.Arbitrary;
@@ -30,6 +34,22 @@ import net.jqwik.api.Provide;
  * and survive system restarts.
  */
 public class DataPersistenceConsistencyProperties {
+    
+    private DatabaseManager dbManager;
+    
+    @BeforeEach
+    void setUp() throws SQLException {
+        dbManager = TestDatabaseConfig.createTestDatabaseManager();
+        TestDatabaseConfig.cleanDatabase(dbManager);
+    }
+    
+    @AfterEach
+    void tearDown() throws SQLException {
+        if (dbManager != null) {
+            TestDatabaseConfig.cleanDatabase(dbManager);
+            dbManager.shutdown();
+        }
+    }
 
     /**
      * Property: For any vehicle saved to the database, retrieving it should return
@@ -41,35 +61,27 @@ public class DataPersistenceConsistencyProperties {
             @ForAll("vehicleTypes") VehicleType vehicleType,
             @ForAll boolean isHandicapped) throws SQLException {
         
-        // Create a test database manager with unique DB for this test
-        DatabaseManager dbManager = new DatabaseManager("jdbc:h2:mem:test_vehicle_" + System.nanoTime());
-        dbManager.initializeDatabase();
+        VehicleDAO vehicleDAO = new VehicleDAO(dbManager);
         
-        try {
-            VehicleDAO vehicleDAO = new VehicleDAO(dbManager);
-            
-            // Create and save a vehicle
-            Vehicle original = new Vehicle(licensePlate, vehicleType, isHandicapped);
-            original.setEntryTime(LocalDateTime.now());
-            
-            Long id = vehicleDAO.save(original);
-            
-            // Retrieve the vehicle
-            Vehicle retrieved = vehicleDAO.findById(id);
-            
-            // Verify persistence
-            assert retrieved != null : "Vehicle should be retrievable after save";
-            assert retrieved.getLicensePlate().equals(original.getLicensePlate()) : 
-                "License plate should match";
-            assert retrieved.getType() == original.getType() : 
-                "Vehicle type should match";
-            assert retrieved.isHandicapped() == original.isHandicapped() : 
-                "Handicapped status should match";
-            assert retrieved.getEntryTime() != null : 
-                "Entry time should be persisted";
-        } finally {
-            dbManager.shutdown();
-        }
+        // Create and save a vehicle
+        Vehicle original = new Vehicle(licensePlate, vehicleType, isHandicapped);
+        original.setEntryTime(LocalDateTime.now());
+        
+        Long id = vehicleDAO.save(original);
+        
+        // Retrieve the vehicle
+        Vehicle retrieved = vehicleDAO.findById(id);
+        
+        // Verify persistence
+        assert retrieved != null : "Vehicle should be retrievable after save";
+        assert retrieved.getLicensePlate().equals(original.getLicensePlate()) : 
+            "License plate should match";
+        assert retrieved.getType() == original.getType() : 
+            "Vehicle type should match";
+        assert retrieved.isHandicapped() == original.isHandicapped() : 
+            "Handicapped status should match";
+        assert retrieved.getEntryTime() != null : 
+            "Entry time should be persisted";
     }
 
     /**
@@ -81,66 +93,59 @@ public class DataPersistenceConsistencyProperties {
             @ForAll("spotIds") String spotId,
             @ForAll("spotTypes") SpotType spotType) throws SQLException {
         
-        DatabaseManager dbManager = new DatabaseManager("jdbc:h2:mem:test_spot_" + System.nanoTime());
-        dbManager.initializeDatabase();
+        ParkingSpotDAO spotDAO = new ParkingSpotDAO(dbManager);
         
-        try {
-            ParkingSpotDAO spotDAO = new ParkingSpotDAO(dbManager);
+        // First, create a parking_lot record (required for foreign key constraint)
+        Connection conn = dbManager.getConnection();
+        Long parkingLotId;
+        try (java.sql.PreparedStatement lotStmt = conn.prepareStatement(
+                "INSERT INTO parking_lots (name, total_floors, total_revenue) VALUES (?, ?, ?)",
+                java.sql.Statement.RETURN_GENERATED_KEYS)) {
+            lotStmt.setString(1, "Test Lot");
+            lotStmt.setInt(2, 1);
+            lotStmt.setDouble(3, 0.0);
+            lotStmt.executeUpdate();
             
-            // First, create a parking_lot record (required for foreign key constraint)
-            Connection conn = dbManager.getConnection();
-            Long parkingLotId;
-            try (java.sql.PreparedStatement lotStmt = conn.prepareStatement(
-                    "INSERT INTO parking_lots (name, total_floors, total_revenue) VALUES (?, ?, ?)",
-                    java.sql.Statement.RETURN_GENERATED_KEYS)) {
-                lotStmt.setString(1, "Test Lot");
-                lotStmt.setInt(2, 1);
-                lotStmt.setDouble(3, 0.0);
-                lotStmt.executeUpdate();
-                
-                try (java.sql.ResultSet lotRs = lotStmt.getGeneratedKeys()) {
-                    lotRs.next();
-                    parkingLotId = lotRs.getLong(1);
-                }
+            try (java.sql.ResultSet lotRs = lotStmt.getGeneratedKeys()) {
+                lotRs.next();
+                parkingLotId = lotRs.getLong(1);
             }
+        }
+        
+        // Now create a floor record
+        try (java.sql.PreparedStatement stmt = conn.prepareStatement(
+                "INSERT INTO floors (parking_lot_id, floor_number, total_spots) VALUES (?, ?, ?)",
+                java.sql.Statement.RETURN_GENERATED_KEYS)) {
+            stmt.setLong(1, parkingLotId);
+            stmt.setInt(2, 1); // floor_number
+            stmt.setInt(3, 10); // total_spots
+            stmt.executeUpdate();
             
-            // Now create a floor record
-            try (java.sql.PreparedStatement stmt = conn.prepareStatement(
-                    "INSERT INTO floors (parking_lot_id, floor_number, total_spots) VALUES (?, ?, ?)",
-                    java.sql.Statement.RETURN_GENERATED_KEYS)) {
-                stmt.setLong(1, parkingLotId);
-                stmt.setInt(2, 1); // floor_number
-                stmt.setInt(3, 10); // total_spots
-                stmt.executeUpdate();
+            try (java.sql.ResultSet rs = stmt.getGeneratedKeys()) {
+                rs.next();
+                Long floorId = rs.getLong(1);
                 
-                try (java.sql.ResultSet rs = stmt.getGeneratedKeys()) {
-                    rs.next();
-                    Long floorId = rs.getLong(1);
-                    
-                    // Create and save a parking spot
-                    ParkingSpot original = new ParkingSpot(spotId, spotType);
-                    
-                    Long id = spotDAO.save(floorId, original);
-                    
-                    // Retrieve the spot
-                    ParkingSpot retrieved = spotDAO.findById(id);
-                    
-                    // Verify persistence
-                    assert retrieved != null : "Spot should be retrievable after save";
-                    assert retrieved.getSpotId().equals(original.getSpotId()) : 
-                        "Spot ID should match";
-                    assert retrieved.getType() == original.getType() : 
-                        "Spot type should match";
-                    assert retrieved.getHourlyRate() == original.getHourlyRate() : 
-                        "Hourly rate should match";
-                    assert retrieved.getStatus() == SpotStatus.AVAILABLE : 
-                        "Initial status should be AVAILABLE";
-                }
-            } finally {
-                dbManager.releaseConnection(conn);
+                // Create and save a parking spot
+                ParkingSpot original = new ParkingSpot(spotId, spotType);
+                
+                Long id = spotDAO.save(floorId, original);
+                
+                // Retrieve the spot
+                ParkingSpot retrieved = spotDAO.findById(id);
+                
+                // Verify persistence
+                assert retrieved != null : "Spot should be retrievable after save";
+                assert retrieved.getSpotId().equals(original.getSpotId()) : 
+                    "Spot ID should match";
+                assert retrieved.getType() == original.getType() : 
+                    "Spot type should match";
+                assert retrieved.getHourlyRate() == original.getHourlyRate() : 
+                    "Hourly rate should match";
+                assert retrieved.getStatus() == SpotStatus.AVAILABLE : 
+                    "Initial status should be AVAILABLE";
             }
         } finally {
-            dbManager.shutdown();
+            dbManager.releaseConnection(conn);
         }
     }
 
@@ -154,40 +159,33 @@ public class DataPersistenceConsistencyProperties {
             @ForAll("fineTypes") FineType fineType,
             @ForAll("fineAmounts") double amount) throws SQLException {
         
-        DatabaseManager dbManager = new DatabaseManager("jdbc:h2:mem:test_fine_" + System.nanoTime());
-        dbManager.initializeDatabase();
+        FineDAO fineDAO = new FineDAO(dbManager);
         
-        try {
-            FineDAO fineDAO = new FineDAO(dbManager);
-            
-            // Create and save a fine
-            Fine original = new Fine(licensePlate, fineType, amount);
-            
-            Long id = fineDAO.save(original);
-            
-            // Retrieve the fine
-            Fine retrieved = fineDAO.findById(id);
-            
-            // Verify persistence
-            assert retrieved != null : "Fine should be retrievable after save";
-            assert retrieved.getLicensePlate().equals(original.getLicensePlate()) : 
-                "License plate should match";
-            assert retrieved.getType() == original.getType() : 
-                "Fine type should match";
-            assert retrieved.getAmount() == original.getAmount() : 
-                "Fine amount should match";
-            assert !retrieved.isPaid() : 
-                "Fine should initially be unpaid";
-            
-            // Verify unpaid fines are retrievable by license plate
-            List<Fine> unpaidFines = fineDAO.findUnpaidByLicensePlate(licensePlate);
-            assert !unpaidFines.isEmpty() : 
-                "Unpaid fines should be retrievable by license plate";
-            assert unpaidFines.stream().anyMatch(f -> f.getId().equals(id)) : 
-                "Saved fine should appear in unpaid fines list";
-        } finally {
-            dbManager.shutdown();
-        }
+        // Create and save a fine
+        Fine original = new Fine(licensePlate, fineType, amount);
+        
+        Long id = fineDAO.save(original);
+        
+        // Retrieve the fine
+        Fine retrieved = fineDAO.findById(id);
+        
+        // Verify persistence
+        assert retrieved != null : "Fine should be retrievable after save";
+        assert retrieved.getLicensePlate().equals(original.getLicensePlate()) : 
+            "License plate should match";
+        assert retrieved.getType() == original.getType() : 
+            "Fine type should match";
+        assert retrieved.getAmount() == original.getAmount() : 
+            "Fine amount should match";
+        assert !retrieved.isPaid() : 
+            "Fine should initially be unpaid";
+        
+        // Verify unpaid fines are retrievable by license plate
+        List<Fine> unpaidFines = fineDAO.findUnpaidByLicensePlate(licensePlate);
+        assert !unpaidFines.isEmpty() : 
+            "Unpaid fines should be retrievable by license plate";
+        assert unpaidFines.stream().anyMatch(f -> f.getId().equals(id)) : 
+            "Saved fine should appear in unpaid fines list";
     }
 
     /**
@@ -201,35 +199,28 @@ public class DataPersistenceConsistencyProperties {
             @ForAll("fineAmounts") double fineAmount,
             @ForAll("paymentMethods") PaymentMethod paymentMethod) throws SQLException {
         
-        DatabaseManager dbManager = new DatabaseManager("jdbc:h2:mem:test_payment_" + System.nanoTime());
-        dbManager.initializeDatabase();
+        PaymentDAO paymentDAO = new PaymentDAO(dbManager);
         
-        try {
-            PaymentDAO paymentDAO = new PaymentDAO(dbManager);
-            
-            // Create and save a payment
-            Payment original = new Payment(licensePlate, parkingFee, fineAmount, paymentMethod);
-            
-            Long id = paymentDAO.save(original);
-            
-            // Retrieve the payment
-            Payment retrieved = paymentDAO.findById(id);
-            
-            // Verify persistence
-            assert retrieved != null : "Payment should be retrievable after save";
-            assert retrieved.getLicensePlate().equals(original.getLicensePlate()) : 
-                "License plate should match";
-            assert Math.abs(retrieved.getParkingFee() - original.getParkingFee()) < 0.01 : 
-                "Parking fee should match";
-            assert Math.abs(retrieved.getFineAmount() - original.getFineAmount()) < 0.01 : 
-                "Fine amount should match";
-            assert Math.abs(retrieved.getTotalAmount() - original.getTotalAmount()) < 0.01 : 
-                "Total amount should match";
-            assert retrieved.getPaymentMethod() == original.getPaymentMethod() : 
-                "Payment method should match";
-        } finally {
-            dbManager.shutdown();
-        }
+        // Create and save a payment
+        Payment original = new Payment(licensePlate, parkingFee, fineAmount, paymentMethod);
+        
+        Long id = paymentDAO.save(original);
+        
+        // Retrieve the payment
+        Payment retrieved = paymentDAO.findById(id);
+        
+        // Verify persistence
+        assert retrieved != null : "Payment should be retrievable after save";
+        assert retrieved.getLicensePlate().equals(original.getLicensePlate()) : 
+            "License plate should match";
+        assert Math.abs(retrieved.getParkingFee() - original.getParkingFee()) < 0.01 : 
+            "Parking fee should match";
+        assert Math.abs(retrieved.getFineAmount() - original.getFineAmount()) < 0.01 : 
+            "Fine amount should match";
+        assert Math.abs(retrieved.getTotalAmount() - original.getTotalAmount()) < 0.01 : 
+            "Total amount should match";
+        assert retrieved.getPaymentMethod() == original.getPaymentMethod() : 
+            "Payment method should match";
     }
 
     /**
@@ -242,61 +233,54 @@ public class DataPersistenceConsistencyProperties {
             @ForAll("spotTypes") SpotType spotType,
             @ForAll("spotStatuses") SpotStatus newStatus) throws SQLException {
         
-        DatabaseManager dbManager = new DatabaseManager("jdbc:h2:mem:test_status_" + System.nanoTime());
-        dbManager.initializeDatabase();
+        ParkingSpotDAO spotDAO = new ParkingSpotDAO(dbManager);
         
-        try {
-            ParkingSpotDAO spotDAO = new ParkingSpotDAO(dbManager);
+        // First, create a parking_lot record (required for foreign key constraint)
+        Connection conn = dbManager.getConnection();
+        Long parkingLotId;
+        try (java.sql.PreparedStatement lotStmt = conn.prepareStatement(
+                "INSERT INTO parking_lots (name, total_floors, total_revenue) VALUES (?, ?, ?)",
+                java.sql.Statement.RETURN_GENERATED_KEYS)) {
+            lotStmt.setString(1, "Test Lot");
+            lotStmt.setInt(2, 1);
+            lotStmt.setDouble(3, 0.0);
+            lotStmt.executeUpdate();
             
-            // First, create a parking_lot record (required for foreign key constraint)
-            Connection conn = dbManager.getConnection();
-            Long parkingLotId;
-            try (java.sql.PreparedStatement lotStmt = conn.prepareStatement(
-                    "INSERT INTO parking_lots (name, total_floors, total_revenue) VALUES (?, ?, ?)",
-                    java.sql.Statement.RETURN_GENERATED_KEYS)) {
-                lotStmt.setString(1, "Test Lot");
-                lotStmt.setInt(2, 1);
-                lotStmt.setDouble(3, 0.0);
-                lotStmt.executeUpdate();
-                
-                try (java.sql.ResultSet lotRs = lotStmt.getGeneratedKeys()) {
-                    lotRs.next();
-                    parkingLotId = lotRs.getLong(1);
-                }
+            try (java.sql.ResultSet lotRs = lotStmt.getGeneratedKeys()) {
+                lotRs.next();
+                parkingLotId = lotRs.getLong(1);
             }
+        }
+        
+        // Now create a floor record
+        try (java.sql.PreparedStatement stmt = conn.prepareStatement(
+                "INSERT INTO floors (parking_lot_id, floor_number, total_spots) VALUES (?, ?, ?)",
+                java.sql.Statement.RETURN_GENERATED_KEYS)) {
+            stmt.setLong(1, parkingLotId);
+            stmt.setInt(2, 1);
+            stmt.setInt(3, 10);
+            stmt.executeUpdate();
             
-            // Now create a floor record
-            try (java.sql.PreparedStatement stmt = conn.prepareStatement(
-                    "INSERT INTO floors (parking_lot_id, floor_number, total_spots) VALUES (?, ?, ?)",
-                    java.sql.Statement.RETURN_GENERATED_KEYS)) {
-                stmt.setLong(1, parkingLotId);
-                stmt.setInt(2, 1);
-                stmt.setInt(3, 10);
-                stmt.executeUpdate();
+            try (java.sql.ResultSet rs = stmt.getGeneratedKeys()) {
+                rs.next();
+                Long floorId = rs.getLong(1);
                 
-                try (java.sql.ResultSet rs = stmt.getGeneratedKeys()) {
-                    rs.next();
-                    Long floorId = rs.getLong(1);
-                    
-                    // Create and save a parking spot
-                    ParkingSpot spot = new ParkingSpot(spotId, spotType);
-                    spotDAO.save(floorId, spot);
-                    
-                    // Update the status
-                    spotDAO.updateStatus(spotId, newStatus);
-                    
-                    // Retrieve and verify
-                    ParkingSpot retrieved = spotDAO.findBySpotId(spotId);
-                    
-                    assert retrieved != null : "Spot should be retrievable after update";
-                    assert retrieved.getStatus() == newStatus : 
-                        "Updated status should be persisted";
-                }
-            } finally {
-                dbManager.releaseConnection(conn);
+                // Create and save a parking spot
+                ParkingSpot spot = new ParkingSpot(spotId, spotType);
+                spotDAO.save(floorId, spot);
+                
+                // Update the status
+                spotDAO.updateStatus(spotId, newStatus);
+                
+                // Retrieve and verify
+                ParkingSpot retrieved = spotDAO.findBySpotId(spotId);
+                
+                assert retrieved != null : "Spot should be retrievable after update";
+                assert retrieved.getStatus() == newStatus : 
+                    "Updated status should be persisted";
             }
         } finally {
-            dbManager.shutdown();
+            dbManager.releaseConnection(conn);
         }
     }
 

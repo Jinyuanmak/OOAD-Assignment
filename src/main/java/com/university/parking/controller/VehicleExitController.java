@@ -7,12 +7,15 @@ import java.util.List;
 
 import com.university.parking.dao.DatabaseManager;
 import com.university.parking.dao.FineDAO;
+import com.university.parking.dao.ParkingSpotDAO;
 import com.university.parking.dao.PaymentDAO;
+import com.university.parking.dao.VehicleDAO;
 import com.university.parking.model.Fine;
 import com.university.parking.model.ParkingLot;
 import com.university.parking.model.ParkingSpot;
 import com.university.parking.model.Payment;
 import com.university.parking.model.PaymentMethod;
+import com.university.parking.model.SpotStatus;
 import com.university.parking.model.Vehicle;
 import com.university.parking.util.FeeCalculator;
 import com.university.parking.util.PaymentProcessor;
@@ -29,6 +32,8 @@ public class VehicleExitController {
     private final DatabaseManager dbManager;
     private final FineDAO fineDAO;
     private final PaymentDAO paymentDAO;
+    private final ParkingSpotDAO spotDAO;
+    private final VehicleDAO vehicleDAO;
     private final List<Fine> unpaidFines;
 
     public VehicleExitController(ParkingLot parkingLot) {
@@ -40,6 +45,8 @@ public class VehicleExitController {
         this.dbManager = dbManager;
         this.fineDAO = fineDAO;
         this.paymentDAO = dbManager != null ? new PaymentDAO(dbManager) : null;
+        this.spotDAO = dbManager != null ? new ParkingSpotDAO(dbManager) : null;
+        this.vehicleDAO = dbManager != null ? new VehicleDAO(dbManager) : null;
         this.unpaidFines = new ArrayList<>();
     }
 
@@ -166,6 +173,24 @@ public class VehicleExitController {
 
         // Mark spot as available (Requirement 4.7)
         summary.getSpot().vacateSpot();
+        
+        // Update vehicle exit time in database
+        if (vehicleDAO != null) {
+            try {
+                vehicleDAO.updateExitTime(licensePlate.trim().toUpperCase(), summary.getVehicle().getExitTime());
+            } catch (SQLException e) {
+                System.err.println("Warning: Failed to update vehicle exit time in database: " + e.getMessage());
+            }
+        }
+        
+        // Update spot status in database
+        if (spotDAO != null) {
+            try {
+                spotDAO.updateStatus(summary.getSpot().getSpotId(), SpotStatus.AVAILABLE);
+            } catch (SQLException e) {
+                System.err.println("Warning: Failed to update spot status in database: " + e.getMessage());
+            }
+        }
 
         // Update parking lot revenue
         parkingLot.setTotalRevenue(parkingLot.getTotalRevenue() + amountPaid);

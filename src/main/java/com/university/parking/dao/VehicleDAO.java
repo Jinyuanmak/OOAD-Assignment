@@ -6,6 +6,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Timestamp;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -41,7 +42,7 @@ public class VehicleDAO {
                 stmt.setBoolean(3, vehicle.isHandicapped());
                 stmt.setTimestamp(4, vehicle.getEntryTime() != null ? Timestamp.valueOf(vehicle.getEntryTime()) : null);
                 stmt.setTimestamp(5, vehicle.getExitTime() != null ? Timestamp.valueOf(vehicle.getExitTime()) : null);
-                stmt.setString(6, null); // assigned_spot_id will be set separately
+                stmt.setString(6, vehicle.getAssignedSpotId()); // Save the assigned spot ID
                 
                 stmt.executeUpdate();
                 
@@ -134,6 +135,41 @@ public class VehicleDAO {
     }
 
     /**
+     * Finds all active vehicles (those without exit times).
+     * This is an alias for findCurrentlyParked() for consistency with ParkingLotDAO.
+     * @return list of active vehicles
+     */
+    public List<Vehicle> findActiveVehicles() throws SQLException {
+        return findCurrentlyParked();
+    }
+
+    /**
+     * Finds an active vehicle by its assigned spot ID.
+     * @param spotId the spot ID
+     * @return the vehicle or null if not found
+     */
+    public Vehicle findActiveBySpotId(String spotId) throws SQLException {
+        String sql = "SELECT * FROM vehicles WHERE assigned_spot_id = ? AND exit_time IS NULL";
+        
+        Connection conn = null;
+        try {
+            conn = dbManager.getConnection();
+            try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.setString(1, spotId);
+                
+                try (ResultSet rs = stmt.executeQuery()) {
+                    if (rs.next()) {
+                        return mapResultSetToVehicle(rs);
+                    }
+                }
+            }
+        } finally {
+            dbManager.releaseConnection(conn);
+        }
+        return null;
+    }
+
+    /**
      * Updates a vehicle in the database.
      * @param id the vehicle ID
      * @param vehicle the updated vehicle data
@@ -151,10 +187,36 @@ public class VehicleDAO {
                 stmt.setBoolean(3, vehicle.isHandicapped());
                 stmt.setTimestamp(4, vehicle.getEntryTime() != null ? Timestamp.valueOf(vehicle.getEntryTime()) : null);
                 stmt.setTimestamp(5, vehicle.getExitTime() != null ? Timestamp.valueOf(vehicle.getExitTime()) : null);
-                stmt.setString(6, null);
+                stmt.setString(6, vehicle.getAssignedSpotId()); // Save the assigned spot ID
                 stmt.setLong(7, id);
                 
                 stmt.executeUpdate();
+            }
+        } finally {
+            dbManager.releaseConnection(conn);
+        }
+    }
+
+    /**
+     * Updates the exit time for a vehicle by license plate.
+     * Used when a vehicle exits the parking lot.
+     * @param licensePlate the license plate
+     * @param exitTime the exit time
+     */
+    public void updateExitTime(String licensePlate, LocalDateTime exitTime) throws SQLException {
+        String sql = "UPDATE vehicles SET exit_time = ? WHERE license_plate = ? AND exit_time IS NULL";
+        
+        Connection conn = null;
+        try {
+            conn = dbManager.getConnection();
+            try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.setTimestamp(1, exitTime != null ? Timestamp.valueOf(exitTime) : null);
+                stmt.setString(2, licensePlate);
+                
+                int rowsUpdated = stmt.executeUpdate();
+                if (rowsUpdated > 0) {
+                    System.out.println("Updated exit time for vehicle: " + licensePlate);
+                }
             }
         } finally {
             dbManager.releaseConnection(conn);
@@ -221,6 +283,11 @@ public class VehicleDAO {
         Timestamp exitTime = rs.getTimestamp("exit_time");
         if (exitTime != null) {
             vehicle.setExitTime(exitTime.toLocalDateTime());
+        }
+        
+        String assignedSpotId = rs.getString("assigned_spot_id");
+        if (assignedSpotId != null) {
+            vehicle.setAssignedSpotId(assignedSpotId);
         }
         
         return vehicle;

@@ -13,6 +13,7 @@ public class Vehicle {
     private LocalDateTime entryTime;
     private LocalDateTime exitTime;
     private boolean isHandicapped;
+    private String assignedSpotId;
 
     public Vehicle() {}
 
@@ -100,6 +101,14 @@ public class Vehicle {
         isHandicapped = handicapped;
     }
 
+    public String getAssignedSpotId() {
+        return assignedSpotId;
+    }
+
+    public void setAssignedSpotId(String assignedSpotId) {
+        this.assignedSpotId = assignedSpotId;
+    }
+
     @Override
     public String toString() {
         return "Vehicle{" +
@@ -108,6 +117,7 @@ public class Vehicle {
                 ", entryTime=" + entryTime +
                 ", exitTime=" + exitTime +
                 ", isHandicapped=" + isHandicapped +
+                ", assignedSpotId='" + assignedSpotId + '\'' +
                 '}';
     }
 }

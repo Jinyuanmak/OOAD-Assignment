@@ -7,10 +7,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.university.parking.dao.DatabaseManager;
+import com.university.parking.dao.ParkingSpotDAO;
 import com.university.parking.dao.VehicleDAO;
 import com.university.parking.model.ParkingLot;
 import com.university.parking.model.ParkingSession;
 import com.university.parking.model.ParkingSpot;
+import com.university.parking.model.SpotStatus;
 import com.university.parking.model.Vehicle;
 import com.university.parking.model.VehicleType;
 
@@ -24,6 +26,7 @@ public class VehicleEntryController {
     private final ParkingLot parkingLot;
     private final DatabaseManager dbManager;
     private final VehicleDAO vehicleDAO;
+    private final ParkingSpotDAO spotDAO;
     private static final DateTimeFormatter TIMESTAMP_FORMAT = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
     public VehicleEntryController(ParkingLot parkingLot) {
@@ -34,6 +37,7 @@ public class VehicleEntryController {
         this.parkingLot = parkingLot;
         this.dbManager = dbManager;
         this.vehicleDAO = dbManager != null ? new VehicleDAO(dbManager) : null;
+        this.spotDAO = dbManager != null ? new ParkingSpotDAO(dbManager) : null;
     }
 
     /**
@@ -114,6 +118,7 @@ public class VehicleEntryController {
         // Record entry time
         LocalDateTime entryTime = LocalDateTime.now();
         vehicle.setEntryTime(entryTime);
+        vehicle.setAssignedSpotId(spotId); // Set assigned spot for database persistence
 
         // Mark spot as occupied (Requirement 3.2)
         spot.occupySpot(vehicle);
@@ -131,6 +136,10 @@ public class VehicleEntryController {
         if (vehicleDAO != null) {
             try {
                 vehicleDAO.save(vehicle);
+                // Update spot status in database
+                if (spotDAO != null) {
+                    spotDAO.updateStatus(spotId, SpotStatus.OCCUPIED);
+                }
             } catch (SQLException e) {
                 System.err.println("Warning: Failed to persist vehicle to database: " + e.getMessage());
                 // Continue without persistence
