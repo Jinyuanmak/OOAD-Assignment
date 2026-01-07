@@ -1,6 +1,14 @@
 # University Parking Lot Management System
 
-A comprehensive parking facility management system built with Java Swing, featuring real-time vehicle tracking, automated fee calculation, fine management, and persistent data storage.
+A comprehensive parking facility management system **built with Java Swing GUI**, featuring real-time vehicle tracking, automated fee calculation, fine management, and persistent data storage.
+
+## GUI Technology
+
+**100% Java Swing Implementation**
+- Complete graphical user interface built with Java Swing components
+- Tabbed interface with 4 main panels (Admin, Entry, Exit, Reports)
+- Professional forms, tables, buttons, and dialogs
+- See `JAVA_SWING_USAGE.md` for detailed Swing component documentation
 
 ## Features
 
@@ -231,14 +239,27 @@ Modify `FineCalculationContext` to change fine calculation:
 
 ### Technologies Used
 - **Java 11** - Core language
-- **Swing** - GUI framework
+- **Java Swing** - Complete GUI framework (100% of UI)
+  - JFrame, JPanel, JTabbedPane for window structure
+  - JTable, JTextField, JComboBox for data input/display
+  - JButton, JLabel, JTextArea for user interaction
+  - JOptionPane for dialogs and messages
+  - See `JAVA_SWING_USAGE.md` for complete component list
 - **H2 Database** - Embedded database
 - **Maven** - Build and dependency management
 - **JUnit 5** - Unit testing
 - **jqwik** - Property-based testing
 
+### GUI Architecture
+- **8 Swing GUI Classes** in `src/main/java/com/university/parking/view/`
+- **MainFrame** - Main application window (JFrame)
+- **4 Panel Classes** - Admin, Entry, Exit, Reports (all JPanel)
+- **BasePanel** - Abstract base class for common functionality
+- **InputValidator** - Form validation
+- **EventHandler** - Event handling
+
 ### Design Patterns
-- **MVC** - Separation of concerns
+- **MVC** - Separation of concerns (View = Swing GUI)
 - **DAO** - Data access abstraction
 - **Strategy** - Fine calculation strategies
 - **Observer** - UI event handling
