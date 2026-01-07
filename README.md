@@ -121,15 +121,68 @@ parking-lot-management/
 
 Admin can select any scheme from the Admin Panel. The selected scheme applies to future entries only.
 
-## Database Schema
+## Database Technology
 
-The system uses H2 embedded database with the following tables:
-- `vehicles` - Vehicle entry/exit records
-- `parking_spots` - Spot status and configuration
-- `payments` - Payment transactions
-- `fines` - Fine records and status
+**H2 Database - Embedded Java SQL Database**
 
-Database file: `parking_lot_db.mv.db` (auto-created)
+### Why H2?
+- ✅ No installation required - embedded in the application
+- ✅ Lightweight (~2 MB) and fast
+- ✅ Data persists to file across sessions
+- ✅ Standard SQL syntax
+- ✅ JDBC compatible
+
+### Configuration
+```xml
+<!-- Maven Dependency (pom.xml) -->
+<dependency>
+    <groupId>com.h2database</groupId>
+    <artifactId>h2</artifactId>
+    <version>2.1.214</version>
+</dependency>
+```
+
+```java
+// Connection URL
+jdbc:h2:./parking_lot_db;DB_CLOSE_DELAY=-1
+```
+
+### Database Tables (7 tables)
+| Table | Purpose |
+|-------|---------|
+| `parking_lots` | Parking lot configuration and revenue |
+| `floors` | Floor information |
+| `parking_spots` | Spot details and status |
+| `vehicles` | Vehicle entry/exit records |
+| `parking_sessions` | Entry/exit sessions with tickets |
+| `fines` | Fine records and payment status |
+| `payments` | Payment transactions |
+
+### DAO Classes (Data Access Layer)
+Located in `src/main/java/com/university/parking/dao/`:
+| File | Purpose |
+|------|---------|
+| **DatabaseManager.java** | Connection pooling (10 connections), schema initialization |
+| **VehicleDAO.java** | Vehicle CRUD operations |
+| **ParkingSpotDAO.java** | Parking spot operations |
+| **FineDAO.java** | Fine management |
+| **PaymentDAO.java** | Payment records |
+
+### Database Features
+- ✅ Connection pooling for efficient access
+- ✅ Prepared statements (SQL injection prevention)
+- ✅ Foreign key relationships
+- ✅ ACID transactions
+- ✅ Auto-generated IDs
+
+### Database File
+```
+parking_lot_db.mv.db  (auto-created in project root)
+```
+
+**To reset database:** Delete `parking_lot_db.mv.db` and restart the application.
+
+See `DATABASE_TOOLS.md` for complete database documentation.
 
 ## Testing
 
@@ -245,10 +298,14 @@ Modify `FineCalculationContext` to change fine calculation:
   - JButton, JLabel, JTextArea for user interaction
   - JOptionPane for dialogs and messages
   - See `JAVA_SWING_USAGE.md` for complete component list
-- **H2 Database** - Embedded database
-- **Maven** - Build and dependency management
+- **H2 Database 2.1.214** - Embedded SQL database
+  - File-based persistence (`parking_lot_db.mv.db`)
+  - JDBC connection with connection pooling
+  - 7 database tables with foreign key relationships
+  - See `DATABASE_TOOLS.md` for complete database documentation
+- **Maven 3.9.12** - Build and dependency management
 - **JUnit 5** - Unit testing
-- **jqwik** - Property-based testing
+- **jqwik 1.7.4** - Property-based testing
 
 ### GUI Architecture
 - **8 Swing GUI Classes** in `src/main/java/com/university/parking/view/`
@@ -274,6 +331,19 @@ Developed by students of the University OOAD course.
 
 ## Version
 
-**Version:** 1.0.0  
+**Version:** 1.0.1  
 **Build Date:** January 2026  
 **Tests Passing:** 146/146 ✓
+
+## Documentation Files
+
+| File | Description |
+|------|-------------|
+| `README.md` | Main project documentation (this file) |
+| `USER_GUIDE.md` | Complete user manual |
+| `QUICK_START.md` | 3-step quick start guide |
+| `JAVA_SWING_USAGE.md` | Detailed Java Swing GUI documentation |
+| `DATABASE_TOOLS.md` | H2 Database documentation |
+| `PROJECT_SUMMARY.md` | Project overview and statistics |
+| `CHANGELOG.md` | Version history and changes |
+| `REQUIREMENTS_COMPLIANCE.md` | Assignment requirements verification |
