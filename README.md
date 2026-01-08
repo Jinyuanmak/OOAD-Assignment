@@ -160,23 +160,23 @@ parking-lot-management/
 ### Layered Architecture
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    Presentation Layer                        │
+│                    Presentation Layer                       │
 │  (ModernMainFrame, Panels, Styled Components, ThemeManager) │
 ├─────────────────────────────────────────────────────────────┤
-│                     Controller Layer                         │
+│                     Controller Layer                        │
 │     (VehicleEntryController, VehicleExitController)         │
 ├─────────────────────────────────────────────────────────────┤
-│                  Business Logic Layer                        │
+│                  Business Logic Layer                       │
 │  (FeeCalculator, FineManager, PaymentProcessor, Receipt)    │
 ├─────────────────────────────────────────────────────────────┤
-│                   Data Access Layer (DAO)                    │
+│                   Data Access Layer (DAO)                   │
 │  (DatabaseManager, VehicleDAO, FineDAO, PaymentDAO, etc.)   │
 ├─────────────────────────────────────────────────────────────┤
-│                      Model Layer                             │
+│                      Model Layer                            │
 │  (ParkingLot, Vehicle, Fine, Payment, Strategy Pattern)     │
 ├─────────────────────────────────────────────────────────────┤
-│                    Database Layer                            │
-│              (MySQL via JDBC with Connection Pool)           │
+│                    Database Layer                           │
+│              (MySQL via JDBC with Connection Pool)          │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -306,14 +306,14 @@ The system uses the **Strategy Pattern** to allow flexible fine calculation. Adm
 
 The system uses **6 main tables**:
 
-| Table | Purpose | Key Fields |
-|-------|---------|-----------|
-| **parking_lots** | Parking lot configuration | id, name, total_floors, total_revenue, current_fine_strategy |
-| **floors** | Floor information | id, parking_lot_id (FK), floor_number, total_spots |
-| **parking_spots** | Spot details and status | id, floor_id (FK), spot_id (UK), spot_type, hourly_rate, status |
-| **vehicles** | Vehicle entry/exit records | id, license_plate, vehicle_type, is_handicapped, entry_time, exit_time, assigned_spot_id |
-| **fines** | Fine records | id, license_plate, fine_type, amount, issued_date, is_paid |
-| **payments** | Payment transactions | id, license_plate, parking_fee, fine_amount, total_amount, payment_method, payment_date |
+| Table             | Purpose                    | Key Fields                                                                               |
+|-------------------|----------------------------|------------------------------------------------------------------------------------------|
+| **parking_lots**  | Parking lot configuration  | id, name, total_floors, total_revenue, current_fine_strategy                             |
+| **floors**        | Floor information          | id, parking_lot_id (FK), floor_number, total_spots                                       |
+| **parking_spots** | Spot details and status    | id, floor_id (FK), spot_id (UK), spot_type, hourly_rate, status                          |
+| **vehicles**      | Vehicle entry/exit records | id, license_plate, vehicle_type, is_handicapped, entry_time, exit_time, assigned_spot_id |
+| **fines**         | Fine records               | id, license_plate, fine_type, amount, issued_date, is_paid                               |
+| **payments**      | Payment transactions       | id, license_plate, parking_fee, fine_amount, total_amount, payment_method, payment_date  |
 
 ### Key Database Features
 - ✅ **Auto-initialization:** Creates database and tables on first run
@@ -330,13 +330,13 @@ The system uses **6 main tables**:
 3. **MySQL runs on:** `localhost:3306`
 
 ### Default Credentials
-| Setting | Value |
-|---------|-------|
-| Host | localhost |
-| Port | 3306 |
+| Setting  | Value       |
+|----------|-------------|
+| Host     | localhost   |
+| Port     | 3306        |
 | Database | parking_lot |
-| Username | root |
-| Password | (empty) |
+| Username | root        |
+| Password | (empty)     |
 
 ### JDBC Configuration
 
@@ -354,29 +354,29 @@ jdbc:mysql://localhost:3306/parking_lot?useSSL=false&serverTimezone=UTC&allowPub
 
 ### JDBC Classes Used (from `java.sql` package)
 
-| Class | Purpose |
-|-------|---------|
-| `Connection` | Database connection |
-| `DriverManager` | Creates connections |
+| Class               | Purpose                                            |
+|---------------------|----------------------------------------------------|
+| `Connection`        | Database connection                                |
+| `DriverManager`     | Creates connections                                |
 | `PreparedStatement` | Parameterized SQL queries (prevents SQL injection) |
-| `Statement` | SQL statement execution |
-| `ResultSet` | Query results |
-| `SQLException` | Database error handling |
-| `Timestamp` | Date/time values |
+| `Statement`         | SQL statement execution                            |
+| `ResultSet`         | Query results                                      |
+| `SQLException`      | Database error handling                            |
+| `Timestamp`         | Date/time values                                   |
 
 ### DAO Classes (Data Access Layer)
 
 All DAO classes are in `src/main/java/com/university/parking/dao/`:
 
-| File | Purpose | Key Methods |
-|------|---------|-------------|
-| **DatabaseManager.java** | Connection pooling, schema initialization | `getConnection()`, `releaseConnection()`, `initializeDatabase()` |
-| **ParkingLotDAO.java** | Parking lot operations | `loadParkingLot()`, `saveParkingLot()`, `updateRevenue()` |
-| **FloorDAO.java** | Floor management | `save()`, `findByParkingLotId()`, `getFloorId()` |
-| **ParkingSpotDAO.java** | Spot operations | `save()`, `findBySpotId()`, `updateStatus()`, `findAvailable()` |
-| **VehicleDAO.java** | Vehicle CRUD | `save()`, `findByLicensePlate()`, `findCurrentlyParked()`, `updateExitTime()` |
-| **FineDAO.java** | Fine management | `save()`, `findUnpaidByLicensePlate()`, `markAsPaid()` |
-| **PaymentDAO.java** | Payment records | `save()`, `findByLicensePlate()`, `calculateTotalRevenue()` |
+| File                     | Purpose                                   | Key Methods                                                                   |
+|--------------------------|-------------------------------------------|-------------------------------------------------------------------------------|
+| **DatabaseManager.java** | Connection pooling, schema initialization | `getConnection()`, `releaseConnection()`, `initializeDatabase()`              |
+| **ParkingLotDAO.java**   | Parking lot operations                    | `loadParkingLot()`, `saveParkingLot()`, `updateRevenue()`                     |
+| **FloorDAO.java**        | Floor management                          | `save()`, `findByParkingLotId()`, `getFloorId()`                              |
+| **ParkingSpotDAO.java**  | Spot operations                           | `save()`, `findBySpotId()`, `updateStatus()`, `findAvailable()`               |
+| **VehicleDAO.java**      | Vehicle CRUD                              | `save()`, `findByLicensePlate()`, `findCurrentlyParked()`, `updateExitTime()` |
+| **FineDAO.java**         | Fine management                           | `save()`, `findUnpaidByLicensePlate()`, `markAsPaid()`                        |
+| **PaymentDAO.java**      | Payment records                           | `save()`, `findByLicensePlate()`, `calculateTotalRevenue()`                   |
 
 ### View Data in phpMyAdmin
 
@@ -736,36 +736,36 @@ If issues persist:
 
 ### Technologies Used
 
-| Technology | Version | Purpose |
-|------------|---------|---------|
-| **Java** | 11+ | Core programming language |
-| **Java Swing** | Built-in | Complete GUI framework (100% of UI) |
-| **MySQL** | 8.0+ | Relational database (via Laragon) |
-| **JDBC** | Built-in | Database connectivity API |
-| **MySQL Connector/J** | 8.0.33 | MySQL JDBC driver |
-| **Laragon** | Latest | Local MySQL development environment |
-| **Maven** | 3.9.12 | Build and dependency management |
+| Technology            | Version  | Purpose                             |
+|-----------------------|----------|-------------------------------------|
+| **Java**              | 11+      | Core programming language           |
+| **Java Swing**        | Built-in | Complete GUI framework (100% of UI) |
+| **MySQL**             | 8.0+     | Relational database (via Laragon)   |
+| **JDBC**              | Built-in | Database connectivity API           |
+| **MySQL Connector/J** | 8.0.33   | MySQL JDBC driver                   |
+| **Laragon**           | Latest   | Local MySQL development environment |
+| **Maven**             | 3.9.12   | Build and dependency management     |
 
 ### Java Swing Components Used
 
 Complete list of Swing components in the GUI:
 
-| Component | Usage | Location |
-|-----------|-------|----------|
-| `JFrame` | Main application window | ModernMainFrame |
-| `JPanel` | Container panels | All panels, cards |
-| `JButton` | Buttons (extended as StyledButton) | All panels |
-| `JTextField` | Text input (extended as StyledTextField) | Entry/Exit panels |
-| `JComboBox` | Dropdown lists (extended as StyledComboBox) | Entry/Exit panels |
-| `JTable` | Data tables (extended as StyledTable) | All panels |
-| `JLabel` | Text labels | All panels |
-| `JDialog` | Modal dialogs (extended as StyledDialog) | All panels |
-| `JScrollPane` | Scrollable containers | Tables, text areas |
-| `BorderLayout` | Main frame layout | ModernMainFrame |
-| `CardLayout` | Content panel switching | ModernMainFrame |
-| `FlowLayout` | Button layouts | Header, Status bar |
-| `BoxLayout` | Vertical layouts | Side navigation |
-| `Timer` | Auto-refresh | Header, Status bar |
+| Component      | Usage                                       | Location           |
+|----------------|---------------------------------------------|--------------------|
+| `JFrame`       | Main application window                     | ModernMainFrame    |
+| `JPanel`       | Container panels                            | All panels, cards  |
+| `JButton`      | Buttons (extended as StyledButton)          | All panels         |
+| `JTextField`   | Text input (extended as StyledTextField)    | Entry/Exit panels  |
+| `JComboBox`    | Dropdown lists (extended as StyledComboBox) | Entry/Exit panels  |
+| `JTable`       | Data tables (extended as StyledTable)       | All panels         |
+| `JLabel`       | Text labels                                 | All panels         |
+| `JDialog`      | Modal dialogs (extended as StyledDialog)    | All panels         |
+| `JScrollPane`  | Scrollable containers                       | Tables, text areas |
+| `BorderLayout` | Main frame layout                           | ModernMainFrame    |
+| `CardLayout`   | Content panel switching                     | ModernMainFrame    |
+| `FlowLayout`   | Button layouts                              | Header, Status bar |
+| `BoxLayout`    | Vertical layouts                            | Side navigation    |
+| `Timer`        | Auto-refresh                                | Header, Status bar |
 
 ### GUI Architecture Details
 
@@ -889,16 +889,16 @@ Developed by students of the University OOAD course.
 
 ## 📚 Documentation Files
 
-| File | Description | Contents |
-|------|-------------|----------|
-| **README.md** | Main project documentation | Overview, setup, features, architecture (this file) |
-| **USER_GUIDE.md** | Complete user manual | Step-by-step usage instructions with workflows |
-| **DATABASE_TOOLS.md** | Database documentation | Schema, SQL queries, phpMyAdmin guide, troubleshooting |
-| **MANUAL_RUN_GUIDE.md** | Manual compilation guide | Compile and run without Maven/JAR using javac |
-| **TESTING_CHECKLIST.md** | Testing documentation | 97 test cases covering all features |
-| **UML_DIAGRAMS.md** | System architecture | Class diagrams, sequence diagrams, ER diagrams (Mermaid) |
-| **database_setup.sql** | SQL setup script | Manual database and table creation (optional) |
-| **pom.xml** | Maven configuration | Dependencies, build configuration, plugins |
+| File                     | Description                | Contents                                                 |
+|--------------------------|----------------------------|----------------------------------------------------------|
+| **README.md**            | Main project documentation | Overview, setup, features, architecture (this file)      |
+| **USER_GUIDE.md**        | Complete user manual       | Step-by-step usage instructions with workflows           |
+| **DATABASE_TOOLS.md**    | Database documentation     | Schema, SQL queries, phpMyAdmin guide, troubleshooting   |
+| **MANUAL_RUN_GUIDE.md**  | Manual compilation guide   | Compile and run without Maven/JAR using javac            |
+| **TESTING_CHECKLIST.md** | Testing documentation      | 97 test cases covering all features                      |
+| **UML_DIAGRAMS.md**      | System architecture        | Class diagrams, sequence diagrams, ER diagrams (Mermaid) |
+| **database_setup.sql**   | SQL setup script           | Manual database and table creation (optional)            |
+| **pom.xml**              | Maven configuration        | Dependencies, build configuration, plugins               |
 
 ### Quick Links
 
