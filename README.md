@@ -4,11 +4,13 @@ A comprehensive parking facility management system **built with Java Swing GUI**
 
 ## GUI Technology
 
-**100% Java Swing Implementation**
+**100% Java Swing Implementation with Modern UI**
 - Complete graphical user interface built with Java Swing components
-- Tabbed interface with 4 main panels (Admin, Entry, Exit, Reports)
-- Professional forms, tables, buttons, and dialogs
-- See `JAVA_SWING_USAGE.md` for detailed Swing component documentation
+- Modern sidebar navigation with 4 main panels (Dashboard, Entry, Exit, Reports)
+- Styled components: buttons, text fields, combo boxes, tables, dialogs
+- Theme management with consistent colors and fonts
+- Header panel with date/time display
+- Status bar with real-time occupancy information
 
 ## Features
 
@@ -160,7 +162,7 @@ Admin can select any scheme from the Admin Panel. The selected scheme applies to
 
 ```java
 // JDBC Connection URL
-jdbc:mysql://localhost:3306/parking_lot_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+jdbc:mysql://localhost:3306/parking_lot?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
 ```
 
 ### JDBC Classes Used
@@ -207,7 +209,7 @@ Located in `src/main/java/com/university/parking/dao/`:
 ### View Data in phpMyAdmin
 1. Right-click Laragon tray icon
 2. Select "MySQL" > "phpMyAdmin"
-3. Browse `parking_lot_db` database
+3. Browse `parking_lot` database
 
 See `DATABASE_TOOLS.md` for complete database documentation.
 
@@ -311,9 +313,9 @@ Modify `FineCalculationContext` to change fine calculation:
 - Laragon default has no password for root
 - If you set a password, update `DEFAULT_PASSWORD` in DatabaseManager.java
 
-### "Unknown database 'parking_lot_db'"
+### "Unknown database 'parking_lot'"
 - The application auto-creates the database on first run
-- Or manually create via phpMyAdmin: `CREATE DATABASE parking_lot_db;`
+- Or manually create via phpMyAdmin: `CREATE DATABASE parking_lot;`
 
 ### Application Won't Start
 - Verify Java 11+ is installed: `java -version`
@@ -371,7 +373,7 @@ Developed by students of the University OOAD course.
 
 ## Version
 
-**Version:** 1.0.1  
+**Version:** 1.1.0  
 **Build Date:** January 2026  
 **Tests Passing:** 146/146 ✓
 
@@ -381,9 +383,5 @@ Developed by students of the University OOAD course.
 |------|-------------|
 | `README.md` | Main project documentation (this file) |
 | `USER_GUIDE.md` | Complete user manual |
-| `QUICK_START.md` | 3-step quick start guide |
-| `JAVA_SWING_USAGE.md` | Detailed Java Swing GUI documentation |
-| `DATABASE_TOOLS.md` | H2 Database documentation |
-| `PROJECT_SUMMARY.md` | Project overview and statistics |
-| `CHANGELOG.md` | Version history and changes |
-| `REQUIREMENTS_COMPLIANCE.md` | Assignment requirements verification |
+| `DATABASE_TOOLS.md` | Database documentation and tools |
+| `database_setup.sql` | SQL script for manual database setup |

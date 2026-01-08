@@ -241,7 +241,7 @@ All data is automatically saved to the database:
 - Fine records
 - Spot status
 
-Data persists across application restarts. The database file is `parking_lot_db.mv.db` in the project folder.
+Data persists across application restarts. The database file is `parking_lot.mv.db` in the project folder.
 
 ---
 

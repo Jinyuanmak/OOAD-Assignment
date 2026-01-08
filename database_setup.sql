@@ -6,8 +6,8 @@
 -- ============================================
 
 -- Step 1: Create Database
-CREATE DATABASE IF NOT EXISTS parking_lot_db;
-USE parking_lot_db;
+CREATE DATABASE IF NOT EXISTS parking_lot;
+USE parking_lot;
 
 -- Step 2: Create Tables
 

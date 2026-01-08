@@ -68,13 +68,13 @@ Download and install Laragon from: https://laragon.org/download/
 
 ### JDBC Connection URL
 ```java
-jdbc:mysql://localhost:3306/parking_lot_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+jdbc:mysql://localhost:3306/parking_lot?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
 ```
 
 **Breakdown:**
 - `jdbc:mysql://` - JDBC driver for MySQL
 - `localhost:3306` - Laragon MySQL server address
-- `parking_lot_db` - Database name (auto-created)
+- `parking_lot` - Database name (auto-created)
 - `useSSL=false` - Disable SSL for local development
 - `serverTimezone=UTC` - Set timezone
 - `allowPublicKeyRetrieval=true` - Allow public key retrieval
@@ -82,7 +82,7 @@ jdbc:mysql://localhost:3306/parking_lot_db?useSSL=false&serverTimezone=UTC&allow
 ### Connection Settings in Code
 ```java
 // DatabaseManager.java
-private static final String DEFAULT_DB_URL = "jdbc:mysql://localhost:3306/parking_lot_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true";
+private static final String DEFAULT_DB_URL = "jdbc:mysql://localhost:3306/parking_lot?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true";
 private static final String DEFAULT_USER = "root";
 private static final String DEFAULT_PASSWORD = "";  // Laragon default: no password
 ```
@@ -121,7 +121,7 @@ import java.sql.Timestamp;
 
 ### Database Name
 ```
-parking_lot_db
+parking_lot
 ```
 
 ### Tables (7 tables with InnoDB engine)
@@ -260,7 +260,7 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 
 public class DatabaseManager {
-    private static final String DB_URL = "jdbc:mysql://localhost:3306/parking_lot_db?useSSL=false&serverTimezone=UTC";
+    private static final String DB_URL = "jdbc:mysql://localhost:3306/parking_lot?useSSL=false&serverTimezone=UTC";
     private static final String USER = "root";
     private static final String PASSWORD = "";
     
@@ -276,7 +276,7 @@ private void createDatabaseIfNotExists() throws SQLException {
     String baseUrl = "jdbc:mysql://localhost:3306?useSSL=false&serverTimezone=UTC";
     try (Connection conn = DriverManager.getConnection(baseUrl, user, password);
          Statement stmt = conn.createStatement()) {
-        stmt.execute("CREATE DATABASE IF NOT EXISTS parking_lot_db");
+        stmt.execute("CREATE DATABASE IF NOT EXISTS parking_lot");
     }
 }
 ```
@@ -345,7 +345,7 @@ Double-click: run-parking-system.bat
 
 ### Step 3: Verify Database
 1. Open phpMyAdmin in Laragon (right-click > MySQL > phpMyAdmin)
-2. Look for `parking_lot_db` database
+2. Look for `parking_lot` database
 3. Check that all 7 tables are created
 
 ---
@@ -358,7 +358,7 @@ Double-click: run-parking-system.bat
 3. Or open browser: http://localhost/phpmyadmin
 
 ### View Tables
-1. Click on `parking_lot_db` database
+1. Click on `parking_lot` database
 2. Browse tables: vehicles, parking_spots, fines, payments, etc.
 3. Run SQL queries directly
 
@@ -400,9 +400,9 @@ public void releaseConnection(Connection conn) {
 - Laragon default has no password for root
 - If you set a password, update `DEFAULT_PASSWORD` in DatabaseManager.java
 
-### "Unknown database 'parking_lot_db'"
+### "Unknown database 'parking_lot'"
 - The application auto-creates the database
-- Or manually create: `CREATE DATABASE parking_lot_db;`
+- Or manually create: `CREATE DATABASE parking_lot;`
 
 ### "Table doesn't exist"
 - Run the application once to create tables
@@ -423,7 +423,7 @@ public void releaseConnection(Connection conn) {
 | **Port** | 3306 |
 | **Username** | root |
 | **Password** | (empty) |
-| **Database Name** | parking_lot_db |
+| **Database Name** | parking_lot |
 | **Tables** | 7 tables (InnoDB engine) |
 | **DAO Classes** | 5 classes (all using JDBC) |
 | **Connection Pool** | 10 connections |
