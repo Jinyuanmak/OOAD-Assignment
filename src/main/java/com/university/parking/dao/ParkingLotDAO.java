@@ -246,4 +246,26 @@ public class ParkingLotDAO {
         }
         return null;
     }
+
+    /**
+     * Updates the total revenue for the parking lot in the database.
+     * @param totalRevenue the new total revenue
+     */
+    public void updateRevenue(double totalRevenue) throws SQLException {
+        String sql = "UPDATE parking_lots SET total_revenue = ? LIMIT 1";
+        
+        Connection conn = null;
+        try {
+            conn = dbManager.getConnection();
+            try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.setDouble(1, totalRevenue);
+                int rowsUpdated = stmt.executeUpdate();
+                if (rowsUpdated > 0) {
+                    System.out.println("Updated parking lot revenue to RM " + String.format("%.2f", totalRevenue));
+                }
+            }
+        } finally {
+            dbManager.releaseConnection(conn);
+        }
+    }
 }

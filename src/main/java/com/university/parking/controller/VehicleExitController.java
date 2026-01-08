@@ -7,6 +7,7 @@ import java.util.List;
 
 import com.university.parking.dao.DatabaseManager;
 import com.university.parking.dao.FineDAO;
+import com.university.parking.dao.ParkingLotDAO;
 import com.university.parking.dao.ParkingSpotDAO;
 import com.university.parking.dao.PaymentDAO;
 import com.university.parking.dao.VehicleDAO;
@@ -34,6 +35,7 @@ public class VehicleExitController {
     private final PaymentDAO paymentDAO;
     private final ParkingSpotDAO spotDAO;
     private final VehicleDAO vehicleDAO;
+    private final ParkingLotDAO parkingLotDAO;
     private final List<Fine> unpaidFines;
 
     public VehicleExitController(ParkingLot parkingLot) {
@@ -47,6 +49,7 @@ public class VehicleExitController {
         this.paymentDAO = dbManager != null ? new PaymentDAO(dbManager) : null;
         this.spotDAO = dbManager != null ? new ParkingSpotDAO(dbManager) : null;
         this.vehicleDAO = dbManager != null ? new VehicleDAO(dbManager) : null;
+        this.parkingLotDAO = dbManager != null ? new ParkingLotDAO(dbManager) : null;
         this.unpaidFines = new ArrayList<>();
     }
 
@@ -194,6 +197,15 @@ public class VehicleExitController {
 
         // Update parking lot revenue
         parkingLot.setTotalRevenue(parkingLot.getTotalRevenue() + amountPaid);
+        
+        // Update revenue in database
+        if (parkingLotDAO != null) {
+            try {
+                parkingLotDAO.updateRevenue(parkingLot.getTotalRevenue());
+            } catch (SQLException e) {
+                System.err.println("Warning: Failed to update revenue in database: " + e.getMessage());
+            }
+        }
 
         // Persist payment to database if available
         if (paymentDAO != null) {
