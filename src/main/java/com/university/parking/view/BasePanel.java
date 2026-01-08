@@ -1,21 +1,23 @@
 package com.university.parking.view;
 
 import java.awt.BorderLayout;
-import java.awt.Font;
+import java.awt.Color;
 
 import javax.swing.BorderFactory;
-import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
-import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
+import javax.swing.table.TableModel;
 
 import com.university.parking.model.ParkingLot;
 
 /**
  * Base panel class providing common functionality for all panels.
  * Implements common UI patterns and validation utilities.
+ * Updated to use modern styled components.
+ * 
+ * Requirements: 4.1, 4.2, 9.1, 9.2, 9.3
  */
 public abstract class BasePanel extends JPanel {
     protected ParkingLot parkingLot;
@@ -41,52 +43,138 @@ public abstract class BasePanel extends JPanel {
     }
 
     /**
-     * Creates a standard button with consistent styling.
+     * Creates a styled button with modern appearance.
+     * Uses StyledButton with hover effects and rounded corners.
+     * 
+     * Requirements: 4.2
+     * 
+     * @param text the button text
+     * @return a StyledButton instance
      */
-    protected JButton createButton(String text) {
-        JButton button = new JButton(text);
-        button.setFont(new Font("SansSerif", Font.PLAIN, 12));
-        return button;
+    protected StyledButton createButton(String text) {
+        return new StyledButton(text);
     }
 
     /**
-     * Creates a standard label.
+     * Creates a styled button with custom color.
+     * Uses StyledButton with hover effects and rounded corners.
+     * 
+     * Requirements: 4.2
+     * 
+     * @param text the button text
+     * @param color the button background color
+     * @return a StyledButton instance
+     */
+    protected StyledButton createButton(String text, Color color) {
+        return new StyledButton(text, color);
+    }
+
+    /**
+     * Creates a standard label with theme styling.
+     * 
+     * @param text the label text
+     * @return a JLabel instance with theme font
      */
     protected JLabel createLabel(String text) {
         JLabel label = new JLabel(text);
-        label.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        label.setFont(ThemeManager.FONT_BODY);
+        label.setForeground(ThemeManager.TEXT_PRIMARY);
         return label;
     }
 
     /**
-     * Creates a standard text field.
+     * Creates a styled text field with modern appearance.
+     * Uses StyledTextField with rounded borders and focus effects.
+     * 
+     * Requirements: 4.1
+     * 
+     * @param columns the number of columns
+     * @return a StyledTextField instance
      */
-    protected JTextField createTextField(int columns) {
-        JTextField field = new JTextField(columns);
-        field.setFont(new Font("SansSerif", Font.PLAIN, 12));
-        return field;
+    protected StyledTextField createTextField(int columns) {
+        return new StyledTextField(columns);
     }
 
     /**
-     * Shows an error message dialog.
-     * Requirement 12.4: Display clear error messages
+     * Creates a styled table with modern appearance.
+     * Uses StyledTable with alternating row colors and hover effects.
+     * 
+     * Requirements: 5.1, 5.2, 5.3, 5.4
+     * 
+     * @param model the table model
+     * @return a StyledTable instance
+     */
+    protected StyledTable createStyledTable(TableModel model) {
+        return new StyledTable(model);
+    }
+
+    /**
+     * Creates a styled table with default model.
+     * Uses StyledTable with alternating row colors and hover effects.
+     * 
+     * Requirements: 5.1, 5.2, 5.3, 5.4
+     * 
+     * @return a StyledTable instance
+     */
+    protected StyledTable createStyledTable() {
+        return new StyledTable();
+    }
+
+    /**
+     * Shows an error message dialog with modern styling.
+     * Uses StyledDialog with red accent color.
+     * 
+     * Requirements: 9.2
+     * 
+     * @param message the error message to display
      */
     protected void showError(String message) {
-        JOptionPane.showMessageDialog(this, message, "Error", JOptionPane.ERROR_MESSAGE);
+        StyledDialog.showError(this, message);
     }
 
     /**
-     * Shows an information message dialog.
+     * Shows an information message dialog with modern styling.
+     * Uses StyledDialog with blue accent color.
+     * 
+     * Requirements: 9.3
+     * 
+     * @param message the information message to display
      */
     protected void showInfo(String message) {
-        JOptionPane.showMessageDialog(this, message, "Information", JOptionPane.INFORMATION_MESSAGE);
+        StyledDialog.showInfo(this, message);
     }
 
     /**
-     * Shows a success message dialog.
+     * Shows a success message dialog with modern styling.
+     * Uses StyledDialog with green accent color.
+     * 
+     * Requirements: 9.1
+     * 
+     * @param message the success message to display
      */
     protected void showSuccess(String message) {
-        JOptionPane.showMessageDialog(this, message, "Success", JOptionPane.INFORMATION_MESSAGE);
+        StyledDialog.showSuccess(this, message);
+    }
+
+    /**
+     * Shows a warning message dialog with modern styling.
+     * Uses StyledDialog with orange accent color.
+     * 
+     * @param message the warning message to display
+     */
+    protected void showWarning(String message) {
+        StyledDialog.showWarning(this, message);
+    }
+
+    /**
+     * Shows a confirmation dialog with modern styling.
+     * Uses StyledDialog with Yes/No buttons.
+     * 
+     * @param message the confirmation message to display
+     * @return true if user confirmed, false otherwise
+     */
+    protected boolean showConfirm(String message) {
+        return StyledDialog.showConfirm(this, message);
     }
 
     /**

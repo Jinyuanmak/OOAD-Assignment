@@ -30,7 +30,7 @@ public class PaymentDAO {
      */
     public Long save(Payment payment) throws SQLException {
         String sql = "INSERT INTO payments (license_plate, parking_fee, fine_amount, total_amount, " +
-                     "payment_method, payment_date, parking_session_id) VALUES (?, ?, ?, ?, ?, ?, ?)";
+                     "payment_method, payment_date) VALUES (?, ?, ?, ?, ?, ?)";
         
         Connection conn = null;
         try {
@@ -42,7 +42,6 @@ public class PaymentDAO {
                 stmt.setDouble(4, payment.getTotalAmount());
                 stmt.setString(5, payment.getPaymentMethod().name());
                 stmt.setTimestamp(6, Timestamp.valueOf(payment.getPaymentDate()));
-                stmt.setObject(7, payment.getParkingSessionId());
                 
                 stmt.executeUpdate();
                 
@@ -167,7 +166,7 @@ public class PaymentDAO {
      */
     public void update(Long id, Payment payment) throws SQLException {
         String sql = "UPDATE payments SET license_plate = ?, parking_fee = ?, fine_amount = ?, " +
-                     "total_amount = ?, payment_method = ?, payment_date = ?, parking_session_id = ? WHERE id = ?";
+                     "total_amount = ?, payment_method = ?, payment_date = ? WHERE id = ?";
         
         Connection conn = null;
         try {
@@ -179,8 +178,7 @@ public class PaymentDAO {
                 stmt.setDouble(4, payment.getTotalAmount());
                 stmt.setString(5, payment.getPaymentMethod().name());
                 stmt.setTimestamp(6, Timestamp.valueOf(payment.getPaymentDate()));
-                stmt.setObject(7, payment.getParkingSessionId());
-                stmt.setLong(8, id);
+                stmt.setLong(7, id);
                 
                 stmt.executeUpdate();
             }
@@ -220,9 +218,6 @@ public class PaymentDAO {
         payment.setTotalAmount(rs.getDouble("total_amount"));
         payment.setPaymentMethod(PaymentMethod.valueOf(rs.getString("payment_method")));
         payment.setPaymentDate(rs.getTimestamp("payment_date").toLocalDateTime());
-        
-        Long sessionId = rs.getObject("parking_session_id", Long.class);
-        payment.setParkingSessionId(sessionId);
         
         return payment;
     }

@@ -29,8 +29,8 @@ public class FineDAO {
      * @return the generated ID
      */
     public Long save(Fine fine) throws SQLException {
-        String sql = "INSERT INTO fines (license_plate, fine_type, amount, issued_date, is_paid, parking_session_id) " +
-                     "VALUES (?, ?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO fines (license_plate, fine_type, amount, issued_date, is_paid) " +
+                     "VALUES (?, ?, ?, ?, ?)";
         
         Connection conn = null;
         try {
@@ -41,7 +41,6 @@ public class FineDAO {
                 stmt.setDouble(3, fine.getAmount());
                 stmt.setTimestamp(4, Timestamp.valueOf(fine.getIssuedDate()));
                 stmt.setBoolean(5, fine.isPaid());
-                stmt.setObject(6, null); // parking_session_id
                 
                 stmt.executeUpdate();
                 

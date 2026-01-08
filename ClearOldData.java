@@ -12,22 +12,16 @@ public class ClearOldData {
         try (Connection conn = DriverManager.getConnection(url, user, password)) {
             System.out.println("✓ Connected to database successfully!");
             
-            // Delete all payments (must be done before parking_sessions due to foreign key)
+            // Delete all payments
             try (Statement stmt = conn.createStatement()) {
                 int deleted = stmt.executeUpdate("DELETE FROM payments");
                 System.out.println("Deleted " + deleted + " payments");
             }
             
-            // Delete all fines (must be done before parking_sessions due to foreign key)
+            // Delete all fines
             try (Statement stmt = conn.createStatement()) {
                 int deleted = stmt.executeUpdate("DELETE FROM fines");
                 System.out.println("Deleted " + deleted + " fines");
-            }
-            
-            // Delete all parking sessions (must be done before vehicles due to foreign key)
-            try (Statement stmt = conn.createStatement()) {
-                int deleted = stmt.executeUpdate("DELETE FROM parking_sessions");
-                System.out.println("Deleted " + deleted + " parking sessions");
             }
             
             // Delete all vehicles

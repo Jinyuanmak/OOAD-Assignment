@@ -128,28 +128,13 @@ public class DatabaseManager {
             );
 
             stmt.execute(
-                "CREATE TABLE IF NOT EXISTS parking_sessions (" +
-                "id BIGINT AUTO_INCREMENT PRIMARY KEY, " +
-                "vehicle_id BIGINT NOT NULL, " +
-                "spot_id VARCHAR(50) NOT NULL, " +
-                "entry_time DATETIME NOT NULL, " +
-                "exit_time DATETIME, " +
-                "duration_hours INT, " +
-                "ticket_number VARCHAR(100) NOT NULL UNIQUE, " +
-                "FOREIGN KEY (vehicle_id) REFERENCES vehicles(id)" +
-                ") ENGINE=InnoDB"
-            );
-
-            stmt.execute(
                 "CREATE TABLE IF NOT EXISTS fines (" +
                 "id BIGINT AUTO_INCREMENT PRIMARY KEY, " +
                 "license_plate VARCHAR(20) NOT NULL, " +
                 "fine_type VARCHAR(30) NOT NULL, " +
                 "amount DECIMAL(10,2) NOT NULL, " +
                 "issued_date DATETIME NOT NULL, " +
-                "is_paid BOOLEAN NOT NULL DEFAULT FALSE, " +
-                "parking_session_id BIGINT, " +
-                "FOREIGN KEY (parking_session_id) REFERENCES parking_sessions(id)" +
+                "is_paid BOOLEAN NOT NULL DEFAULT FALSE" +
                 ") ENGINE=InnoDB"
             );
 
@@ -161,9 +146,7 @@ public class DatabaseManager {
                 "fine_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00, " +
                 "total_amount DECIMAL(10,2) NOT NULL, " +
                 "payment_method VARCHAR(20) NOT NULL, " +
-                "payment_date DATETIME NOT NULL, " +
-                "parking_session_id BIGINT, " +
-                "FOREIGN KEY (parking_session_id) REFERENCES parking_sessions(id)" +
+                "payment_date DATETIME NOT NULL" +
                 ") ENGINE=InnoDB"
             );
 

@@ -128,6 +128,7 @@ public class VehicleExitPanel extends BasePanel {
 
         panel.add(createLabel("Payment Method:"));
         paymentMethodCombo = new JComboBox<>(PaymentMethod.values());
+        paymentMethodCombo.setPreferredSize(new java.awt.Dimension(120, 30)); // Ensure full text is visible
         panel.add(paymentMethodCombo);
 
         processPaymentButton = createButton("Process Payment");

@@ -13,7 +13,7 @@ import com.university.parking.model.Floor;
 import com.university.parking.model.ParkingLot;
 import com.university.parking.model.ParkingSpot;
 import com.university.parking.model.SpotType;
-import com.university.parking.view.MainFrame;
+import com.university.parking.view.ModernMainFrame;
 
 /**
  * Main application entry point for the University Parking Lot Management System.
@@ -55,16 +55,18 @@ public class ParkingApplication {
         // Launch GUI on Event Dispatch Thread
         SwingUtilities.invokeLater(() -> {
             try {
-                MainFrame mainFrame = new MainFrame(finalParkingLot, finalDbManager, finalFineDAO);
+                ModernMainFrame mainFrame = new ModernMainFrame(finalParkingLot, finalDbManager, finalFineDAO);
                 mainFrame.setVisible(true);
                 
-                // Add shutdown hook to close database connections
-                if (finalDbManager != null) {
-                    Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                        System.out.println("Shutting down database connections...");
+                // Add shutdown hook to close database connections and cleanup
+                Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                    System.out.println("Shutting down application...");
+                    mainFrame.cleanup();
+                    if (finalDbManager != null) {
+                        System.out.println("Closing database connections...");
                         finalDbManager.shutdown();
-                    }));
-                }
+                    }
+                }));
             } catch (Exception e) {
                 JOptionPane.showMessageDialog(null, 
                     "Failed to start application: " + e.getMessage(),
