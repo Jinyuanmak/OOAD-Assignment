@@ -12,6 +12,7 @@ import com.university.parking.dao.ParkingSpotDAO;
 import com.university.parking.dao.PaymentDAO;
 import com.university.parking.dao.VehicleDAO;
 import com.university.parking.model.Fine;
+import com.university.parking.model.FixedFineStrategy;
 import com.university.parking.model.ParkingLot;
 import com.university.parking.model.ParkingSpot;
 import com.university.parking.model.Payment;
@@ -19,6 +20,7 @@ import com.university.parking.model.PaymentMethod;
 import com.university.parking.model.SpotStatus;
 import com.university.parking.model.Vehicle;
 import com.university.parking.util.FeeCalculator;
+import com.university.parking.util.FineManager;
 import com.university.parking.util.PaymentProcessor;
 import com.university.parking.util.Receipt;
 
@@ -32,6 +34,7 @@ public class VehicleExitController {
     private final ParkingLot parkingLot;
     private final DatabaseManager dbManager;
     private final FineDAO fineDAO;
+    private final FineManager fineManager;
     private final PaymentDAO paymentDAO;
     private final ParkingSpotDAO spotDAO;
     private final VehicleDAO vehicleDAO;
@@ -46,6 +49,7 @@ public class VehicleExitController {
         this.parkingLot = parkingLot;
         this.dbManager = dbManager;
         this.fineDAO = fineDAO;
+        this.fineManager = fineDAO != null ? new FineManager(fineDAO) : null;
         this.paymentDAO = dbManager != null ? new PaymentDAO(dbManager) : null;
         this.spotDAO = dbManager != null ? new ParkingSpotDAO(dbManager) : null;
         this.vehicleDAO = dbManager != null ? new VehicleDAO(dbManager) : null;
@@ -67,14 +71,47 @@ public class VehicleExitController {
 
         String normalizedPlate = licensePlate.trim().toUpperCase();
         
+        // First, try to load vehicle from database to get elapsed_hours
+        Vehicle dbVehicle = null;
+        if (vehicleDAO != null) {
+            try {
+                dbVehicle = vehicleDAO.findByLicensePlate(normalizedPlate);
+            } catch (SQLException e) {
+                System.err.println("Warning: Failed to load vehicle from database: " + e.getMessage());
+            }
+        }
+        
+        // Search in-memory parking lot for the spot
         for (ParkingSpot spot : parkingLot.getAllSpots()) {
             if (!spot.isAvailable() && spot.getCurrentVehicle() != null) {
                 Vehicle vehicle = spot.getCurrentVehicle();
                 if (normalizedPlate.equals(vehicle.getLicensePlate())) {
+                    // If we have database vehicle with elapsed_hours, use those values
+                    if (dbVehicle != null && dbVehicle.getElapsedHours() != null) {
+                        vehicle.setElapsedSeconds(dbVehicle.getElapsedSeconds());
+                        vehicle.setElapsedMinutes(dbVehicle.getElapsedMinutes());
+                        vehicle.setElapsedHours(dbVehicle.getElapsedHours());
+                        vehicle.setIsOverstay(dbVehicle.getIsOverstay());
+                    }
                     return new VehicleLookupResult(vehicle, spot);
                 }
             }
         }
+        
+        // If not found in memory but exists in database, load from database
+        if (dbVehicle != null && dbVehicle.getAssignedSpotId() != null) {
+            // Find the spot by ID
+            ParkingSpot spot = parkingLot.findSpotById(dbVehicle.getAssignedSpotId());
+            if (spot != null) {
+                // Sync in-memory spot with database state
+                if (spot.isAvailable()) {
+                    // Spot is available in memory but vehicle is in database - occupy it
+                    spot.occupySpot(dbVehicle);
+                }
+                return new VehicleLookupResult(dbVehicle, spot);
+            }
+        }
+        
         return null;
     }
 
@@ -100,8 +137,16 @@ public class VehicleExitController {
         LocalDateTime exitTime = LocalDateTime.now();
         vehicle.setExitTime(exitTime);
 
-        // Calculate duration (ceiling rounded)
-        long durationHours = vehicle.calculateParkingDuration();
+        // Calculate duration - use elapsed_hours from VIEW if available, otherwise calculate manually
+        long durationHours;
+        if (vehicle.getElapsedHours() != null && vehicle.getElapsedHours() > 0) {
+            // Use elapsed_hours from database VIEW (timezone-aware)
+            durationHours = vehicle.getElapsedHours();
+        } else {
+            // Fallback to manual calculation (ceiling rounded)
+            durationHours = vehicle.calculateParkingDuration();
+        }
+        
         if (durationHours == 0) {
             durationHours = 1; // Minimum 1 hour charge
         }
@@ -217,8 +262,9 @@ public class VehicleExitController {
             }
         }
 
-        // Mark fines as paid in database if payment is sufficient
-        if (isPaymentSufficient && fineDAO != null && unpaidFinesList != null) {
+        // ALWAYS mark the original fines as paid (even for partial payment)
+        // The unpaid balance fine will represent what's still owed
+        if (fineDAO != null && unpaidFinesList != null) {
             for (Fine fine : unpaidFinesList) {
                 if (fine.getId() != null) {
                     try {
@@ -241,8 +287,6 @@ public class VehicleExitController {
                 );
                 unpaidBalanceFine.setPaid(false);
                 fineDAO.save(unpaidBalanceFine);
-                System.out.println("Created unpaid balance fine of RM " + 
-                    String.format("%.2f", remainingBalance) + " for " + licensePlate);
             } catch (SQLException e) {
                 System.err.println("Warning: Failed to create unpaid balance fine: " + e.getMessage());
             }
@@ -270,6 +314,7 @@ public class VehicleExitController {
     /**
      * Gets unpaid fines for a license plate.
      * Requirement 4.5: Check for unpaid fines linked to the license plate
+     * Also generates overstay fine if vehicle has overstayed.
      * 
      * @param licensePlate the license plate to check
      * @return list of unpaid fines
@@ -278,7 +323,45 @@ public class VehicleExitController {
         List<Fine> finesForPlate = new ArrayList<>();
         String normalizedPlate = licensePlate.trim().toUpperCase();
         
-        // Try to get fines from database first
+        // Check if vehicle has overstayed and generate fine if needed
+        VehicleLookupResult lookupResult = lookupVehicle(normalizedPlate);
+        if (lookupResult != null && fineManager != null) {
+            Vehicle vehicle = lookupResult.getVehicle();
+            
+            // Check if vehicle has overstayed (using elapsed_hours from VIEW or isOverstay flag)
+            boolean hasOverstayed = false;
+            if (vehicle.getIsOverstay() != null && vehicle.getIsOverstay()) {
+                hasOverstayed = true;
+            } else if (vehicle.getElapsedHours() != null && vehicle.getElapsedHours() > 24) {
+                hasOverstayed = true;
+            }
+            
+            // Generate overstay fine if needed
+            if (hasOverstayed) {
+                try {
+                    // Check if overstay fine already exists for this vehicle
+                    List<Fine> existingFines = fineDAO.findUnpaidByLicensePlate(normalizedPlate);
+                    boolean hasOverstayFine = existingFines.stream()
+                        .anyMatch(f -> f.getType() == com.university.parking.model.FineType.OVERSTAY);
+                    
+                    if (!hasOverstayFine) {
+                        // Generate and save overstay fine using FixedFineStrategy (RM 50)
+                        Fine overstayFine = fineManager.checkAndGenerateOverstayFine(
+                            vehicle, 
+                            new FixedFineStrategy()
+                        );
+                        
+                        if (overstayFine != null) {
+                            fineDAO.save(overstayFine);
+                        }
+                    }
+                } catch (SQLException e) {
+                    System.err.println("Warning: Failed to generate overstay fine: " + e.getMessage());
+                }
+            }
+        }
+        
+        // Try to get all fines from database
         if (fineDAO != null) {
             try {
                 finesForPlate = fineDAO.findUnpaidByLicensePlate(normalizedPlate);

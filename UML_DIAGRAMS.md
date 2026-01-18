@@ -32,6 +32,7 @@ classDiagram
         +validateUniqueSpotIds() boolean
         +validateSpotIdFormat() boolean
         +findAvailableSpots(VehicleType) List~ParkingSpot~
+        +findSpotById(String) ParkingSpot
         +addRevenue(double)
         +changeFineStrategy(FineCalculationStrategy)
     }
@@ -66,8 +67,20 @@ classDiagram
         -LocalDateTime exitTime
         -boolean isHandicapped
         -String assignedSpotId
+        -Long elapsedSeconds
+        -Long elapsedMinutes
+        -Long elapsedHours
+        -Boolean isOverstay
         +calculateParkingDuration() long
         +canParkInSpot(SpotType) boolean
+        +getElapsedSeconds() Long
+        +getElapsedMinutes() Long
+        +getElapsedHours() Long
+        +getIsOverstay() Boolean
+        +setElapsedSeconds(Long)
+        +setElapsedMinutes(Long)
+        +setElapsedHours(Long)
+        +setIsOverstay(Boolean)
     }
 
     class Fine {
@@ -560,6 +573,7 @@ classDiagram
         -ParkingLot parkingLot
         -DatabaseManager dbManager
         -FineDAO fineDAO
+        -FineManager fineManager
         -PaymentDAO paymentDAO
         -ParkingSpotDAO spotDAO
         -VehicleDAO vehicleDAO
@@ -644,6 +658,7 @@ classDiagram
 
     VehicleExitController --> VehicleDAO
     VehicleExitController --> FineDAO
+    VehicleExitController --> FineManager : uses
     VehicleExitController --> PaymentDAO
     VehicleExitController --> ParkingSpotDAO
     VehicleExitController --> ParkingLotDAO
@@ -654,6 +669,7 @@ classDiagram
     VehicleExitController --> PaymentProcessor : uses
 
     FineManager --> FineDAO
+    FineManager --> FineCalculationStrategy : uses
     PaymentProcessor ..> Receipt : creates
 
     ExitResult --> PaymentSummary
@@ -769,6 +785,7 @@ sequenceDiagram
     participant User as Operator
     participant ExitPanel as VehicleExitPanel
     participant Controller as VehicleExitController
+    participant FineManager
     participant FeeCalc as FeeCalculator
     participant PayProc as PaymentProcessor
     participant VehicleDAO
@@ -779,74 +796,103 @@ sequenceDiagram
     participant DB as Database
 
     User->>ExitPanel: Enter license plate
-    User->>ExitPanel: Click "Search"
+    User->>ExitPanel: Click "Lookup Vehicle"
     
-    ExitPanel->>Controller: lookupVehicle(licensePlate)
-    Controller->>Controller: Search all spots for vehicle
+    ExitPanel->>Controller: getUnpaidFines(licensePlate)
+    Controller->>Controller: lookupVehicle(licensePlate)
     
-    alt Vehicle Not Found
-        Controller-->>ExitPanel: null
-        ExitPanel->>User: Show error dialog
-    else Vehicle Found
-        Controller-->>ExitPanel: VehicleLookupResult
-        
-        ExitPanel->>FineDAO: findUnpaidByLicensePlate(licensePlate)
+    alt Vehicle in Memory
+        Controller->>Controller: Find in parking lot spots
+    else Vehicle in Database Only
+        Controller->>VehicleDAO: findByLicensePlate(licensePlate)
+        VehicleDAO->>DB: SELECT FROM vehicles_with_duration
+        DB-->>VehicleDAO: Vehicle with elapsed_hours, isOverstay
+        VehicleDAO-->>Controller: Vehicle
+        Controller->>Controller: findSpotById(assignedSpotId)
+        Controller->>Controller: Sync in-memory spot
+    end
+    
+    Controller-->>Controller: VehicleLookupResult
+    
+    alt Vehicle Has Overstayed (elapsed_hours > 24 OR isOverstay = TRUE)
+        Controller->>FineDAO: findUnpaidByLicensePlate(licensePlate)
         FineDAO->>DB: SELECT unpaid fines
-        DB-->>FineDAO: Fines list
-        FineDAO-->>ExitPanel: List~Fine~
+        DB-->>FineDAO: Existing fines
+        FineDAO-->>Controller: List~Fine~
         
-        ExitPanel->>Controller: generatePaymentSummary(licensePlate, fines)
-        Controller->>Controller: Set exit time
-        Controller->>Controller: Calculate duration (ceiling rounded)
-        Controller->>FeeCalc: calculateParkingFee(vehicle, spot, duration)
-        FeeCalc-->>Controller: Parking fee
-        Controller->>Controller: Calculate total fines
-        Controller->>FeeCalc: calculateTotalAmount(parkingFee, fines)
-        FeeCalc-->>Controller: Total due
-        Controller-->>ExitPanel: PaymentSummary
-        
-        ExitPanel->>User: Display payment summary
-        
-        User->>ExitPanel: Enter payment amount
-        User->>ExitPanel: Select payment method
-        User->>ExitPanel: Click "Process Payment"
-        
-        ExitPanel->>Controller: processExit(licensePlate, amount, method, fines)
-        
-        Controller->>PayProc: validatePayment(amount, totalDue)
-        PayProc-->>Controller: isValid
-        
-        Controller->>PayProc: processPayment(...)
-        PayProc-->>Controller: Payment object
-        
-        Controller->>PayProc: generateReceipt(...)
-        PayProc-->>Controller: Receipt
-        
-        Controller->>Controller: Vacate spot
-        
-        Controller->>VehicleDAO: updateExitTime(licensePlate, exitTime)
-        VehicleDAO->>DB: UPDATE vehicles SET exit_time
-        
-        Controller->>SpotDAO: updateStatus(spotId, AVAILABLE)
-        SpotDAO->>DB: UPDATE parking_spots SET status
-        
-        Controller->>Controller: Update parking lot revenue
-        Controller->>LotDAO: updateRevenue(totalRevenue)
+        alt No Overstay Fine Exists
+            Controller->>FineManager: checkAndGenerateOverstayFine(vehicle, strategy)
+            FineManager-->>Controller: Fine (RM 50.00)
+            Controller->>FineDAO: save(overstayFine)
+            FineDAO->>DB: INSERT INTO fines
+        end
+    end
+    
+    Controller->>FineDAO: findUnpaidByLicensePlate(licensePlate)
+    FineDAO->>DB: SELECT unpaid fines
+    DB-->>FineDAO: All unpaid fines
+    FineDAO-->>Controller: List~Fine~
+    Controller-->>ExitPanel: List~Fine~
+    
+    ExitPanel->>Controller: generatePaymentSummary(licensePlate, fines)
+    Controller->>Controller: Set exit time
+    Controller->>Controller: Calculate duration (use elapsed_hours from VIEW)
+    Controller->>FeeCalc: calculateParkingFee(vehicle, spot, duration)
+    FeeCalc-->>Controller: Parking fee
+    Controller->>Controller: Calculate total fines
+    Controller->>FeeCalc: calculateTotalAmount(parkingFee, fines)
+    FeeCalc-->>Controller: Total due
+    Controller-->>ExitPanel: PaymentSummary
+    
+    ExitPanel->>User: Display payment summary
+    
+    User->>ExitPanel: Enter payment amount
+    User->>ExitPanel: Select payment method
+    User->>ExitPanel: Click "Process Payment"
+    
+    ExitPanel->>Controller: processExit(licensePlate, amount, method, fines)
+    
+    Controller->>PayProc: validatePayment(amount, totalDue)
+    PayProc-->>Controller: isPaymentSufficient
+    
+    Controller->>PayProc: processPayment(...)
+    PayProc-->>Controller: Payment object
+    
+    Controller->>PayProc: generateReceipt(...)
+    PayProc-->>Controller: Receipt
+    
+    Controller->>Controller: Vacate spot
+    
+    Controller->>VehicleDAO: updateExitTime(licensePlate, exitTime)
+    VehicleDAO->>DB: UPDATE vehicles SET exit_time
+    
+    Controller->>SpotDAO: updateStatus(spotId, AVAILABLE)
+    SpotDAO->>DB: UPDATE parking_spots SET status
+    
+    Controller->>Controller: Update parking lot revenue
+    Controller->>LotDAO: updateRevenue(totalRevenue)
         LotDAO->>DB: UPDATE parking_lots SET total_revenue
         
         Controller->>PaymentDAO: save(payment)
         PaymentDAO->>DB: INSERT INTO payments
         
-        alt Payment Sufficient
-            Controller->>FineDAO: markAsPaid(fineIds)
-            FineDAO->>DB: UPDATE fines SET is_paid = TRUE
-        else Payment Insufficient
+        Note over Controller,FineDAO: ALWAYS mark original fines as paid
+        Controller->>FineDAO: markAsPaid(all original fines)
+        FineDAO->>DB: UPDATE fines SET is_paid = TRUE
+        
+        alt Payment Insufficient (Partial Payment)
+            Controller->>PayProc: calculateRemainingBalance(amount, totalDue)
+            PayProc-->>Controller: remainingBalance
             Controller->>FineDAO: save(unpaidBalanceFine)
-            FineDAO->>DB: INSERT INTO fines (UNPAID_BALANCE)
+            FineDAO->>DB: INSERT INTO fines (UNPAID_BALANCE, amount=remainingBalance)
+            Controller-->>ExitPanel: ExitResult (paymentSufficient=false)
+            ExitPanel->>User: Show partial payment dialog<br/>"Remaining balance: RM XX.XX"
+        else Payment Sufficient (Full Payment)
+            Controller-->>ExitPanel: ExitResult (paymentSufficient=true)
+            ExitPanel->>User: Show success message
         end
         
-        Controller-->>ExitPanel: ExitResult with receipt
-        ExitPanel->>User: Show receipt dialog
+        ExitPanel->>User: Display receipt
     end
 ```
 
@@ -1002,6 +1048,7 @@ erDiagram
     PARKING_SPOT ||--o| VEHICLE : "currently parks"
     VEHICLE ||--o{ FINE : "has fines"
     VEHICLE ||--o{ PAYMENT : "has payments"
+    VEHICLE ||--|| VEHICLES_WITH_DURATION : "real-time view"
 
     PARKING_LOT {
         bigint id PK
@@ -1036,6 +1083,20 @@ erDiagram
         datetime entry_time
         datetime exit_time
         varchar assigned_spot_id
+    }
+    
+    VEHICLES_WITH_DURATION {
+        bigint id "VIEW - Real-time calculation"
+        varchar license_plate
+        varchar vehicle_type
+        boolean is_handicapped
+        datetime entry_time
+        datetime exit_time
+        varchar assigned_spot_id
+        bigint elapsed_seconds "Computed"
+        bigint elapsed_minutes "Computed"
+        bigint elapsed_hours "Computed"
+        boolean is_overstay "Computed (>24 hours)"
     }
 
     FINE {
@@ -1100,3 +1161,43 @@ erDiagram
 - GitHub: Automatically renders Mermaid diagrams
 - VS Code: Install "Markdown Preview Mermaid Support" extension
 - Other tools: Any Markdown viewer with Mermaid support
+
+
+---
+
+## Recent Updates (January 2026)
+
+### New Features Reflected in Diagrams
+
+1. **Real-Time Elapsed Time Tracking**
+   - Added `vehicles_with_duration` VIEW in ER diagram
+   - Vehicle model includes: elapsed_seconds, elapsed_minutes, elapsed_hours, isOverstay
+   - Timezone-aware calculation (UTC+8)
+
+2. **Automatic Overstay Fine Generation**
+   - VehicleExitController now uses FineManager
+   - Overstay fine (RM 50) generated automatically during lookup
+   - Sequence diagram updated to show fine generation flow
+
+3. **Partial Payment Handling**
+   - Original fines always marked as paid
+   - UNPAID_BALANCE fine created for remaining amount
+   - Sequence diagram shows both full and partial payment flows
+
+4. **Database Vehicle Lookup**
+   - ParkingLot.findSpotById() method added
+   - Can find vehicles inserted via SQL (not just in-memory)
+   - Syncs in-memory state with database
+
+5. **Auto-Clear Entry Form**
+   - Form fields cleared after successful entry
+   - Improves user experience for multiple entries
+
+### Key Implementation Details
+
+- **Overstay Detection**: Uses `isOverstay` flag from VIEW or `elapsed_hours > 24`
+- **Fine Strategy**: FixedFineStrategy (RM 50.00 flat fine)
+- **Fine Persistence**: Linked to license plate, persists across sessions
+- **Payment Logic**: Always marks original fines as paid, creates unpaid balance for remainder
+- **Database VIEW**: Calculates elapsed time in real-time, no caching
+

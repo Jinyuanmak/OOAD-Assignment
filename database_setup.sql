@@ -5,6 +5,16 @@
 -- to manually create the database and tables
 -- ============================================
 
+-- Step 0: Set Timezone (Important for elapsed time calculations)
+-- Adjust this to your local timezone:
+-- Malaysia/Singapore/China: '+08:00'n
+-- Thailand/Vietnam: '+07:00'
+-- Japan/Korea: '+09:00'
+-- India: '+05:30'
+-- UK: '+00:00'
+SET GLOBAL time_zone = '+08:00';
+SET SESSION time_zone = '+08:00';
+
 -- Step 1: Create Database
 CREATE DATABASE IF NOT EXISTS parking_lot;
 USE parking_lot;
@@ -51,6 +61,42 @@ CREATE TABLE IF NOT EXISTS vehicles (
     exit_time DATETIME,
     assigned_spot_id VARCHAR(50)
 ) ENGINE=InnoDB;
+
+-- Create a VIEW for real-time elapsed time tracking
+-- This view calculates elapsed time on-the-fly when queried
+-- Note: Uses CURRENT_TIMESTAMP which respects session timezone
+CREATE OR REPLACE VIEW vehicles_with_duration AS
+SELECT 
+    v.*,
+    CASE 
+        WHEN v.exit_time IS NOT NULL THEN 
+            TIMESTAMPDIFF(SECOND, v.entry_time, v.exit_time)
+        WHEN v.entry_time IS NOT NULL THEN 
+            TIMESTAMPDIFF(SECOND, v.entry_time, CURRENT_TIMESTAMP)
+        ELSE 0
+    END as elapsed_seconds,
+    CASE 
+        WHEN v.exit_time IS NOT NULL THEN 
+            TIMESTAMPDIFF(MINUTE, v.entry_time, v.exit_time)
+        WHEN v.entry_time IS NOT NULL THEN 
+            TIMESTAMPDIFF(MINUTE, v.entry_time, CURRENT_TIMESTAMP)
+        ELSE 0
+    END as elapsed_minutes,
+    CASE 
+        WHEN v.exit_time IS NOT NULL THEN 
+            TIMESTAMPDIFF(HOUR, v.entry_time, v.exit_time)
+        WHEN v.entry_time IS NOT NULL THEN 
+            TIMESTAMPDIFF(HOUR, v.entry_time, CURRENT_TIMESTAMP)
+        ELSE 0
+    END as elapsed_hours,
+    CASE 
+        WHEN v.exit_time IS NOT NULL THEN 
+            TIMESTAMPDIFF(HOUR, v.entry_time, v.exit_time) > 24
+        WHEN v.entry_time IS NOT NULL THEN 
+            TIMESTAMPDIFF(HOUR, v.entry_time, CURRENT_TIMESTAMP) > 24
+        ELSE FALSE
+    END as is_overstay
+FROM vehicles v;
 
 -- Table 5: fines
 CREATE TABLE IF NOT EXISTS fines (

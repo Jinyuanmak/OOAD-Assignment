@@ -4,6 +4,7 @@ import java.awt.BorderLayout;
 import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.GridLayout;
+import java.sql.SQLException;
 import java.util.List;
 
 import javax.swing.JButton;
@@ -18,6 +19,7 @@ import javax.swing.table.DefaultTableModel;
 
 import com.university.parking.dao.DatabaseManager;
 import com.university.parking.dao.FineDAO;
+import com.university.parking.dao.VehicleDAO;
 import com.university.parking.model.Fine;
 import com.university.parking.model.FineCalculationStrategy;
 import com.university.parking.model.FixedFineStrategy;
@@ -46,6 +48,7 @@ public class AdminPanel extends BasePanel {
     private DefaultTableModel fineTableModel;
     private final DatabaseManager dbManager;
     private final FineDAO fineDAO;
+    private final VehicleDAO vehicleDAO;
 
     public AdminPanel(ParkingLot parkingLot) {
         this(parkingLot, null, null);
@@ -55,6 +58,7 @@ public class AdminPanel extends BasePanel {
         super(parkingLot);
         this.dbManager = dbManager;
         this.fineDAO = fineDAO;
+        this.vehicleDAO = dbManager != null ? new VehicleDAO(dbManager) : null;
         initializeComponents();
     }
 
@@ -236,6 +240,26 @@ public class AdminPanel extends BasePanel {
     private void refreshVehicleTable() {
         vehicleTableModel.setRowCount(0);
         
+        // If database is available, load vehicles directly from database
+        if (vehicleDAO != null) {
+            try {
+                List<Vehicle> currentlyParked = vehicleDAO.findCurrentlyParked();
+                for (Vehicle vehicle : currentlyParked) {
+                    vehicleTableModel.addRow(new Object[]{
+                        vehicle.getLicensePlate(),
+                        vehicle.getType(),
+                        vehicle.getAssignedSpotId(),
+                        vehicle.getEntryTime()
+                    });
+                }
+                return; // Successfully loaded from database
+            } catch (SQLException e) {
+                System.err.println("Error loading vehicles from database: " + e.getMessage());
+                // Fall through to load from in-memory parking lot
+            }
+        }
+        
+        // Fallback: Load from in-memory parking lot
         for (Floor floor : parkingLot.getFloors()) {
             for (ParkingSpot spot : floor.getAllSpots()) {
                 if (!spot.isAvailable() && spot.getCurrentVehicle() != null) {

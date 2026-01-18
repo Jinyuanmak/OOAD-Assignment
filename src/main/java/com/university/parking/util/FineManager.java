@@ -27,6 +27,7 @@ public class FineManager {
 
     /**
      * Checks if a vehicle has overstayed and generates a fine if necessary.
+     * Uses the elapsed_hours from the database VIEW if available, otherwise calculates manually.
      * @param vehicle the vehicle to check
      * @param strategy the fine calculation strategy to use
      * @return the generated fine, or null if no fine is needed
@@ -36,8 +37,16 @@ public class FineManager {
             return null;
         }
 
-        LocalDateTime currentTime = vehicle.getExitTime() != null ? vehicle.getExitTime() : LocalDateTime.now();
-        long hoursParked = ChronoUnit.HOURS.between(vehicle.getEntryTime(), currentTime);
+        long hoursParked;
+        
+        // Use elapsed_hours from VIEW if available (real-time tracking)
+        if (vehicle.getElapsedHours() != null) {
+            hoursParked = vehicle.getElapsedHours();
+        } else {
+            // Fallback to manual calculation
+            LocalDateTime currentTime = vehicle.getExitTime() != null ? vehicle.getExitTime() : LocalDateTime.now();
+            hoursParked = ChronoUnit.HOURS.between(vehicle.getEntryTime(), currentTime);
+        }
 
         if (hoursParked > OVERSTAY_THRESHOLD_HOURS) {
             long overstayHours = hoursParked - OVERSTAY_THRESHOLD_HOURS;

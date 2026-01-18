@@ -64,7 +64,7 @@ public class VehicleDAO {
      * @return the vehicle or null if not found
      */
     public Vehicle findById(Long id) throws SQLException {
-        String sql = "SELECT * FROM vehicles WHERE id = ?";
+        String sql = "SELECT * FROM vehicles_with_duration WHERE id = ?";
         
         Connection conn = null;
         try {
@@ -90,7 +90,7 @@ public class VehicleDAO {
      * @return the vehicle or null if not found
      */
     public Vehicle findByLicensePlate(String licensePlate) throws SQLException {
-        String sql = "SELECT * FROM vehicles WHERE license_plate = ? ORDER BY id DESC LIMIT 1";
+        String sql = "SELECT * FROM vehicles_with_duration WHERE license_plate = ? ORDER BY id DESC LIMIT 1";
         
         Connection conn = null;
         try {
@@ -115,7 +115,7 @@ public class VehicleDAO {
      * @return list of currently parked vehicles
      */
     public List<Vehicle> findCurrentlyParked() throws SQLException {
-        String sql = "SELECT * FROM vehicles WHERE exit_time IS NULL";
+        String sql = "SELECT * FROM vehicles_with_duration WHERE exit_time IS NULL";
         
         Connection conn = null;
         try {
@@ -149,7 +149,7 @@ public class VehicleDAO {
      * @return the vehicle or null if not found
      */
     public Vehicle findActiveBySpotId(String spotId) throws SQLException {
-        String sql = "SELECT * FROM vehicles WHERE assigned_spot_id = ? AND exit_time IS NULL";
+        String sql = "SELECT * FROM vehicles_with_duration WHERE assigned_spot_id = ? AND exit_time IS NULL";
         
         Connection conn = null;
         try {
@@ -247,7 +247,7 @@ public class VehicleDAO {
      * @return list of all vehicles
      */
     public List<Vehicle> findAll() throws SQLException {
-        String sql = "SELECT * FROM vehicles";
+        String sql = "SELECT * FROM vehicles_with_duration";
         
         Connection conn = null;
         try {
@@ -268,6 +268,7 @@ public class VehicleDAO {
 
     /**
      * Maps a ResultSet row to a Vehicle object.
+     * Handles both base table and VIEW columns.
      */
     private Vehicle mapResultSetToVehicle(ResultSet rs) throws SQLException {
         Vehicle vehicle = new Vehicle();
@@ -288,6 +289,31 @@ public class VehicleDAO {
         String assignedSpotId = rs.getString("assigned_spot_id");
         if (assignedSpotId != null) {
             vehicle.setAssignedSpotId(assignedSpotId);
+        }
+        
+        // Try to read computed fields from VIEW (may not exist if querying base table)
+        try {
+            Long elapsedSeconds = rs.getLong("elapsed_seconds");
+            if (!rs.wasNull()) {
+                vehicle.setElapsedSeconds(elapsedSeconds);
+            }
+            
+            Long elapsedMinutes = rs.getLong("elapsed_minutes");
+            if (!rs.wasNull()) {
+                vehicle.setElapsedMinutes(elapsedMinutes);
+            }
+            
+            Long elapsedHours = rs.getLong("elapsed_hours");
+            if (!rs.wasNull()) {
+                vehicle.setElapsedHours(elapsedHours);
+            }
+            
+            Boolean isOverstay = rs.getBoolean("is_overstay");
+            if (!rs.wasNull()) {
+                vehicle.setIsOverstay(isOverstay);
+            }
+        } catch (SQLException e) {
+            // Columns don't exist (querying base table), ignore
         }
         
         return vehicle;

@@ -52,8 +52,9 @@ public class DatabaseManager {
      */
     public DatabaseManager(String databaseName, String user, String password, int poolSize) throws SQLException {
         this.databaseName = databaseName;
+        // Use Asia/Singapore timezone (UTC+8) to match Malaysia/Singapore/China time
         this.dbUrl = "jdbc:mysql://localhost:3306/" + databaseName + 
-                     "?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true";
+                     "?useSSL=false&serverTimezone=Asia/Singapore&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true";
         this.user = user;
         this.password = password;
         this.poolSize = poolSize;
@@ -71,7 +72,8 @@ public class DatabaseManager {
     }
 
     private void createDatabaseIfNotExists() throws SQLException {
-        String baseUrl = "jdbc:mysql://localhost:3306?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true";
+        // Use Asia/Singapore timezone (UTC+8) for database connection
+        String baseUrl = "jdbc:mysql://localhost:3306?useSSL=false&serverTimezone=Asia/Singapore&allowPublicKeyRetrieval=true";
         try (Connection conn = DriverManager.getConnection(baseUrl, user, password);
              Statement stmt = conn.createStatement()) {
             stmt.execute("CREATE DATABASE IF NOT EXISTS " + databaseName);
@@ -150,7 +152,35 @@ public class DatabaseManager {
                 ") ENGINE=InnoDB"
             );
 
+            // Create VIEW for real-time elapsed time tracking
+            stmt.execute(
+                "CREATE OR REPLACE VIEW vehicles_with_duration AS " +
+                "SELECT v.*, " +
+                "CASE " +
+                "  WHEN v.exit_time IS NOT NULL THEN TIMESTAMPDIFF(SECOND, v.entry_time, v.exit_time) " +
+                "  WHEN v.entry_time IS NOT NULL THEN TIMESTAMPDIFF(SECOND, v.entry_time, CURRENT_TIMESTAMP) " +
+                "  ELSE 0 " +
+                "END as elapsed_seconds, " +
+                "CASE " +
+                "  WHEN v.exit_time IS NOT NULL THEN TIMESTAMPDIFF(MINUTE, v.entry_time, v.exit_time) " +
+                "  WHEN v.entry_time IS NOT NULL THEN TIMESTAMPDIFF(MINUTE, v.entry_time, CURRENT_TIMESTAMP) " +
+                "  ELSE 0 " +
+                "END as elapsed_minutes, " +
+                "CASE " +
+                "  WHEN v.exit_time IS NOT NULL THEN TIMESTAMPDIFF(HOUR, v.entry_time, v.exit_time) " +
+                "  WHEN v.entry_time IS NOT NULL THEN TIMESTAMPDIFF(HOUR, v.entry_time, CURRENT_TIMESTAMP) " +
+                "  ELSE 0 " +
+                "END as elapsed_hours, " +
+                "CASE " +
+                "  WHEN v.exit_time IS NOT NULL THEN TIMESTAMPDIFF(HOUR, v.entry_time, v.exit_time) > 24 " +
+                "  WHEN v.entry_time IS NOT NULL THEN TIMESTAMPDIFF(HOUR, v.entry_time, CURRENT_TIMESTAMP) > 24 " +
+                "  ELSE FALSE " +
+                "END as is_overstay " +
+                "FROM vehicles v"
+            );
+
             System.out.println("All tables created successfully in MySQL database '" + databaseName + "'.");
+            System.out.println("VIEW 'vehicles_with_duration' created for real-time elapsed time tracking.");
         } finally {
             releaseConnection(conn);
         }

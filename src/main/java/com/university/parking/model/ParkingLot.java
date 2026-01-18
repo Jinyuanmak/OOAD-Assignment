@@ -109,6 +109,21 @@ public class ParkingLot {
         return availableSpots;
     }
 
+    /**
+     * Finds a parking spot by its ID.
+     * @param spotId the spot ID to search for (e.g., "F1-R2-S3")
+     * @return the parking spot or null if not found
+     */
+    public ParkingSpot findSpotById(String spotId) {
+        for (Floor floor : floors) {
+            ParkingSpot spot = floor.findSpotById(spotId);
+            if (spot != null) {
+                return spot;
+            }
+        }
+        return null;
+    }
+
     // Getters and setters
     public String getName() {
         return name;

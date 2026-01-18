@@ -217,10 +217,16 @@ public class VehicleEntryPanel extends BasePanel {
             // Display ticket
             ticketArea.setText(result.getTicketDisplay());
 
+            showSuccess("Vehicle entry processed successfully!");
+            
+            // Clear input fields for next entry (keep ticket visible)
+            licensePlateField.setText("");
+            vehicleTypeCombo.setSelectedIndex(0); // Reset to MOTORCYCLE
+            handicappedCheckbox.setSelected(false);
+            spotTable.clearSelection();
+            
             // Refresh available spots
             refreshAvailableSpots();
-
-            showSuccess("Vehicle entry processed successfully!");
         } catch (IllegalArgumentException e) {
             showError(e.getMessage());
         }

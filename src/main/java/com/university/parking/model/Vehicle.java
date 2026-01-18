@@ -14,6 +14,12 @@ public class Vehicle {
     private LocalDateTime exitTime;
     private boolean isHandicapped;
     private String assignedSpotId;
+    
+    // Real-time elapsed time fields (computed from VIEW)
+    private Long elapsedSeconds;
+    private Long elapsedMinutes;
+    private Long elapsedHours;
+    private Boolean isOverstay;
 
     public Vehicle() {}
 
@@ -107,6 +113,40 @@ public class Vehicle {
 
     public void setAssignedSpotId(String assignedSpotId) {
         this.assignedSpotId = assignedSpotId;
+    }
+
+    // Getters for elapsed time fields (read-only, computed by database VIEW)
+    public Long getElapsedSeconds() {
+        return elapsedSeconds;
+    }
+
+    public Long getElapsedMinutes() {
+        return elapsedMinutes;
+    }
+
+    public Long getElapsedHours() {
+        return elapsedHours;
+    }
+
+    public Boolean getIsOverstay() {
+        return isOverstay;
+    }
+
+    // Public setters for DAO use (these fields are computed by database VIEW)
+    public void setElapsedSeconds(Long elapsedSeconds) {
+        this.elapsedSeconds = elapsedSeconds;
+    }
+
+    public void setElapsedMinutes(Long elapsedMinutes) {
+        this.elapsedMinutes = elapsedMinutes;
+    }
+
+    public void setElapsedHours(Long elapsedHours) {
+        this.elapsedHours = elapsedHours;
+    }
+
+    public void setIsOverstay(Boolean isOverstay) {
+        this.isOverstay = isOverstay;
     }
 
     @Override

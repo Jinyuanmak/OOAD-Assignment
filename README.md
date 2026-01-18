@@ -35,6 +35,7 @@ A comprehensive parking facility management system **built with Java Swing GUI**
 - **Persistent Storage** - MySQL database with connection pooling for data persistence
 
 ### Advanced Features
+- **Real-Time Elapsed Time Tracking** - Automatic calculation of parking duration (seconds, minutes, hours) that updates in real-time using database VIEW
 - **Unpaid Balance Tracking** - Partial payments create fines that persist across sessions (linked to license plate)
 - **Handicapped Pricing** - Special RM 2/hour rate for handicapped vehicles in designated spots
 - **Strategy Pattern Fine System** - Three configurable fine calculation strategies (Fixed, Hourly, Progressive)
@@ -43,8 +44,14 @@ A comprehensive parking facility management system **built with Java Swing GUI**
 - **Admin Dashboard** - Real-time statistics with dashboard cards showing occupancy, revenue, available spots, and parked vehicles
 - **Spot ID Format** - Unique identifiers following "F{floor}-R{row}-S{spot}" format (e.g., "F1-R2-S3")
 - **Ceiling-Rounded Duration** - Parking duration calculated in hours with ceiling rounding (minimum 1 hour)
+- **Timezone Aware** - Configured for UTC+8 (Malaysia/Singapore/China) with adjustable timezone settings
 
 ## 🚀 Quick Start
+
+### Recent Fixes (January 2026)
+✅ **Dashboard Refresh Issue** - Fixed refresh button to reload vehicles from database  
+✅ **Overstay Fine Generation** - Fixed automatic overstay fine (RM 50) generation for vehicles exceeding 24 hours  
+📖 See [QUICK_START_TEST.md](QUICK_START_TEST.md) for testing guide
 
 ### Prerequisites
 - **Java 11 or higher** - Check with `java -version`
@@ -619,6 +626,14 @@ public static final int HEADER_HEIGHT = 60;
 
 ### Version 1.1.0 (January 2026)
 
+#### Real-Time Elapsed Time Tracking ⏱️
+- **DATABASE VIEW Implementation:** Created `vehicles_with_duration` VIEW for real-time elapsed time calculation
+- **Automatic Tracking:** Elapsed time (seconds, minutes, hours) calculated on-the-fly when queried
+- **Overstay Detection:** Automatic `is_overstay` flag when parking duration exceeds 24 hours
+- **Timezone Fix:** Changed JDBC connection from UTC to Asia/Singapore (UTC+8) to eliminate 8-hour offset
+- **Auto-Initialization:** VIEW automatically created when application starts
+- **No Manual Setup:** No need to run SQL scripts manually for VIEW creation
+
 #### GUI Modernization ✨
 - **Modern UI Design:** Complete redesign with professional styling
 - **Custom Components:** StyledButton, StyledTextField, StyledTable, StyledComboBox, StyledDialog
@@ -629,6 +644,7 @@ public static final int HEADER_HEIGHT = 60;
 - **Header Panel:** Live date/time display with auto-refresh
 
 #### Bug Fixes 🐛
+- **Timezone 8-Hour Offset:** Fixed JDBC connection timezone from UTC to Asia/Singapore (UTC+8)
 - **Duplicate Parking Prevention:** Added validation to prevent same vehicle parking in multiple spots
 - **Database Schema:** Removed non-existent `parking_session_id` column references from FineDAO and PaymentDAO
 - **Visual Issues:** Removed Unicode emoji icons that displayed as rectangles
@@ -636,13 +652,18 @@ public static final int HEADER_HEIGHT = 60;
 - **Payment Method Display:** Widened combo box to show full text (CASH/CARD)
 
 #### Database Improvements 🗄️
+- **Real-Time VIEW:** `vehicles_with_duration` VIEW for automatic elapsed time calculation
 - **MySQL Integration:** Switched from H2 to MySQL with Laragon
 - **Connection Pooling:** Implemented custom connection pool (10 connections)
-- **Auto-initialization:** Database and tables created automatically on first run
+- **Auto-initialization:** Database, tables, and VIEW created automatically on first run
 - **InnoDB Engine:** ACID transactions and foreign key support
+- **Timezone Configuration:** JDBC connections use Asia/Singapore timezone (UTC+8)
 
 #### Documentation 📚
 - **Complete Rewrite:** Updated all documentation files
+- **Real-Time Tracking Guide:** Added `REAL_TIME_TRACKING_IMPLEMENTATION.md`
+- **Timezone Fix Guide:** Added `TIMEZONE_FIX_APPLIED.md`
+- **Quick Test Guide:** Added `QUICK_TEST_GUIDE.md` for testing elapsed time tracking
 - **UML Diagrams:** Added comprehensive system architecture diagrams
 - **Testing Checklist:** Created 97 test cases covering all features
 - **Manual Run Guide:** Added guide for running without Maven/JAR
@@ -896,6 +917,8 @@ Developed by students of the University OOAD course.
 | **DATABASE_TOOLS.md**    | Database documentation     | Schema, SQL queries, phpMyAdmin guide, troubleshooting   |
 | **MANUAL_RUN_GUIDE.md**  | Manual compilation guide   | Compile and run without Maven/JAR using javac            |
 | **TESTING_CHECKLIST.md** | Testing documentation      | 97 test cases covering all features                      |
+| **QUICK_OVERSTAY_TEST.md** | Quick overstay testing | Copy-paste SQL commands for instant overstay testing |
+| **OVERSTAY_FINE_TESTING_GUIDE.md** | Detailed overstay testing | Complete guide to test overstay fines without waiting 24 hours |
 | **UML_DIAGRAMS.md**      | System architecture        | Class diagrams, sequence diagrams, ER diagrams (Mermaid) |
 | **database_setup.sql**   | SQL setup script           | Manual database and table creation (optional)            |
 | **pom.xml**              | Maven configuration        | Dependencies, build configuration, plugins               |
@@ -906,5 +929,6 @@ Developed by students of the University OOAD course.
 - **User Manual:** Open `USER_GUIDE.md`
 - **Database Help:** Open `DATABASE_TOOLS.md`
 - **Testing Guide:** Open `TESTING_CHECKLIST.md`
+- **Overstay Testing:** Open `QUICK_OVERSTAY_TEST.md` - Test overstay fines instantly!
 - **Architecture:** Open `UML_DIAGRAMS.md`
 - **Manual Build:** Open `MANUAL_RUN_GUIDE.md`
