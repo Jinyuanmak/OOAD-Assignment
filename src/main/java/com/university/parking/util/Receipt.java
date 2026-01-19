@@ -45,32 +45,61 @@ public class Receipt {
     }
 
     /**
-     * Generates a formatted receipt string.
+     * Generates a formatted receipt string with modern, beautiful formatting.
      * @return formatted receipt text
      */
     public String generateReceiptText() {
         StringBuilder receipt = new StringBuilder();
+        
+        // Header
         receipt.append("========================================\n");
-        receipt.append("       PARKING RECEIPT\n");
+        receipt.append("       UNIVERSITY PARKING LOT\n");
+        receipt.append("          PAYMENT RECEIPT\n");
         receipt.append("========================================\n");
-        receipt.append(String.format("License Plate: %s\n", licensePlate));
-        receipt.append(String.format("Spot: %s\n", spotId));
-        receipt.append(String.format("Entry Time: %s\n", entryTime.format(DATE_FORMATTER)));
-        receipt.append(String.format("Exit Time: %s\n", exitTime.format(DATE_FORMATTER)));
-        receipt.append(String.format("Duration: %d hour(s)\n", durationHours));
+        receipt.append("\n");
+        
+        // Vehicle Information
+        receipt.append("License Plate : ").append(licensePlate).append("\n");
+        receipt.append("Parking Spot  : ").append(spotId).append("\n");
+        receipt.append("\n");
+        
+        // Parking Duration
+        receipt.append("Entry Time    : ").append(entryTime.format(DATE_FORMATTER)).append("\n");
+        receipt.append("Exit Time     : ").append(exitTime.format(DATE_FORMATTER)).append("\n");
+        receipt.append("Duration      : ").append(durationHours).append(" hour(s)\n");
+        receipt.append("\n");
+        
+        // Charges Breakdown
         receipt.append("----------------------------------------\n");
-        receipt.append(String.format("Parking Fee: RM %.2f\n", parkingFee));
-        receipt.append(String.format("Fines: RM %.2f\n", fineAmount));
+        receipt.append(String.format("Parking Fee   : RM %.2f\n", parkingFee));
+        if (fineAmount > 0) {
+            receipt.append(String.format("Fines         : RM %.2f\n", fineAmount));
+        }
         receipt.append("----------------------------------------\n");
-        receipt.append(String.format("Total Amount: RM %.2f\n", totalAmount));
-        receipt.append(String.format("Amount Paid: RM %.2f\n", amountPaid));
-        receipt.append(String.format("Payment Method: %s\n", paymentMethod));
-        receipt.append(String.format("Remaining Balance: RM %.2f\n", remainingBalance));
-        receipt.append("----------------------------------------\n");
-        receipt.append(String.format("Payment Date: %s\n", paymentDate.format(DATE_FORMATTER)));
+        receipt.append(String.format("TOTAL AMOUNT  : RM %.2f\n", totalAmount));
         receipt.append("========================================\n");
+        receipt.append("\n");
+        
+        // Payment Information
+        receipt.append(String.format("Amount Paid   : RM %.2f\n", amountPaid));
+        receipt.append("Payment Method: ").append(paymentMethod).append("\n");
+        
+        if (remainingBalance > 0) {
+            receipt.append(String.format("BALANCE DUE   : RM %.2f\n", remainingBalance));
+        } else {
+            receipt.append("Status        : PAID IN FULL\n");
+        }
+        
+        receipt.append("Payment Date  : ").append(paymentDate.format(DATE_FORMATTER)).append("\n");
+        receipt.append("========================================\n");
+        receipt.append("\n");
+        
+        // Footer
         receipt.append("     Thank you for parking with us!\n");
-        receipt.append("========================================\n");
+        receipt.append("     Have a safe journey!\n");
+        receipt.append("\n");
+        receipt.append("  For inquiries: chiushiaoying@student.mmu.edu.my\n");
+        
         return receipt.toString();
     }
 

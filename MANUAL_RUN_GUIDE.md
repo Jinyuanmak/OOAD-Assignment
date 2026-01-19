@@ -50,7 +50,7 @@ Open phpMyAdmin (right-click Laragon > MySQL > phpMyAdmin) and run:
 CREATE DATABASE IF NOT EXISTS parking_lot;
 ```
 
-Or run the `database_setup.sql` file in phpMyAdmin.
+Or run the `database/database_setup.sql` file in phpMyAdmin.
 
 ### Step 2: Create Output Directory
 

@@ -12,7 +12,6 @@ import com.university.parking.dao.ParkingSpotDAO;
 import com.university.parking.dao.PaymentDAO;
 import com.university.parking.dao.VehicleDAO;
 import com.university.parking.model.Fine;
-import com.university.parking.model.FixedFineStrategy;
 import com.university.parking.model.ParkingLot;
 import com.university.parking.model.ParkingSpot;
 import com.university.parking.model.Payment;
@@ -345,10 +344,10 @@ public class VehicleExitController {
                         .anyMatch(f -> f.getType() == com.university.parking.model.FineType.OVERSTAY);
                     
                     if (!hasOverstayFine) {
-                        // Generate and save overstay fine using FixedFineStrategy (RM 50)
+                        // Generate and save overstay fine using parking lot's current strategy
                         Fine overstayFine = fineManager.checkAndGenerateOverstayFine(
                             vehicle, 
-                            new FixedFineStrategy()
+                            parkingLot.getFineCalculationContext().getStrategy()
                         );
                         
                         if (overstayFine != null) {

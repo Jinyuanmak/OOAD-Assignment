@@ -8,6 +8,7 @@ import java.util.List;
 
 import javax.swing.JButton;
 import javax.swing.JComboBox;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
@@ -20,6 +21,7 @@ import com.university.parking.dao.FineDAO;
 import com.university.parking.model.Fine;
 import com.university.parking.model.ParkingLot;
 import com.university.parking.model.PaymentMethod;
+import com.university.parking.util.Receipt;
 
 /**
  * Panel for processing vehicle exits.
@@ -39,6 +41,7 @@ public class VehicleExitPanel extends BasePanel {
     private final DatabaseManager dbManager;
     private final FineDAO fineDAO;
     private VehicleExitController.PaymentSummary currentSummary;
+    private Receipt lastReceipt; // Store last receipt for PDF generation
 
     public VehicleExitPanel(ParkingLot parkingLot) {
         this(parkingLot, null, null);
@@ -197,9 +200,16 @@ public class VehicleExitPanel extends BasePanel {
                 licensePlate, amountPaid, paymentMethod, unpaidFines
             );
 
-            // Display receipt
-            receiptArea.setText(result.getReceipt().generateReceiptText());
+            // Store receipt for PDF generation
+            lastReceipt = result.getReceipt();
+            
+            // Get receipt text
+            String receiptText = result.getReceipt().generateReceiptText();
+            
+            // Display receipt in text area
+            receiptArea.setText(receiptText);
 
+            // Show success/partial payment message
             if (!result.isPaymentSufficient()) {
                 showInfo("PARTIAL PAYMENT PROCESSED!\n\n" +
                     "Remaining balance: RM " + String.format("%.2f", result.getRemainingBalance()) + "\n\n" +
@@ -208,6 +218,18 @@ public class VehicleExitPanel extends BasePanel {
                     "Please pay the full amount on the next visit.");
             } else {
                 showSuccess("Payment processed successfully!");
+            }
+            
+            // Show receipt in dialog
+            showReceiptDialog(receiptText);
+            
+            // Clear the receipt field after showing dialog
+            receiptArea.setText("");
+            
+            // Ask if user wants to save PDF
+            boolean wantsPDF = showConfirm("Would you like to save the receipt as PDF?");
+            if (wantsPDF) {
+                saveReceiptAsPDF(receiptText, licensePlate);
             }
 
             // Clear form for next transaction
@@ -220,6 +242,65 @@ public class VehicleExitPanel extends BasePanel {
             e.printStackTrace();
         }
     }
+    
+    /**
+     * Shows the receipt in a dialog window.
+     */
+    private void showReceiptDialog(String receiptText) {
+        JTextArea receiptDisplay = new JTextArea(receiptText);
+        receiptDisplay.setEditable(false);
+        receiptDisplay.setFont(new Font("Monospaced", Font.PLAIN, 12));
+        receiptDisplay.setMargin(new Insets(10, 10, 10, 10));
+        
+        JScrollPane scrollPane = new JScrollPane(receiptDisplay);
+        scrollPane.setPreferredSize(new java.awt.Dimension(500, 400));
+        
+        JOptionPane.showMessageDialog(
+            this,
+            scrollPane,
+            "Payment Receipt",
+            JOptionPane.INFORMATION_MESSAGE
+        );
+    }
+    
+    /**
+     * Saves the receipt as a PDF file.
+     */
+    private void saveReceiptAsPDF(String receiptText, String licensePlate) {
+        try {
+            // Create receipts directory if it doesn't exist
+            java.io.File receiptsDir = new java.io.File("receipts");
+            if (!receiptsDir.exists()) {
+                receiptsDir.mkdirs();
+            }
+            
+            // Generate filename with timestamp
+            String timestamp = java.time.LocalDateTime.now()
+                .format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+            String filename = "receipts/receipt_" + licensePlate + "_" + timestamp + ".pdf";
+            
+            if (lastReceipt != null) {
+                // Generate PDF using PDFBox
+                com.university.parking.util.ReceiptPDFGenerator.generatePDF(
+                    lastReceipt, 
+                    filename
+                );
+                
+                showSuccess("Receipt saved successfully as PDF!\n\nFile: " + filename);
+            } else {
+                // Fallback to text file if receipt object not available
+                String textFilename = "receipts/receipt_" + licensePlate + "_" + timestamp + ".txt";
+                try (java.io.FileWriter writer = new java.io.FileWriter(textFilename)) {
+                    writer.write(receiptText);
+                }
+                showSuccess("Receipt saved successfully as text file!\n\nFile: " + textFilename);
+            }
+            
+        } catch (Exception e) {
+            showError("Failed to save receipt: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
 
     private void clearForm() {
         licensePlateField.setText("");
@@ -227,6 +308,7 @@ public class VehicleExitPanel extends BasePanel {
         paymentAmountField.setText("");
         receiptArea.setText("");
         currentSummary = null;
+        lastReceipt = null;
         processPaymentButton.setEnabled(false);
     }
 

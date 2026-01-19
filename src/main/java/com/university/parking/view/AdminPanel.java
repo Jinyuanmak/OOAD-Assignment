@@ -19,6 +19,7 @@ import javax.swing.table.DefaultTableModel;
 
 import com.university.parking.dao.DatabaseManager;
 import com.university.parking.dao.FineDAO;
+import com.university.parking.dao.ParkingLotDAO;
 import com.university.parking.dao.VehicleDAO;
 import com.university.parking.model.Fine;
 import com.university.parking.model.FineCalculationStrategy;
@@ -49,6 +50,7 @@ public class AdminPanel extends BasePanel {
     private final DatabaseManager dbManager;
     private final FineDAO fineDAO;
     private final VehicleDAO vehicleDAO;
+    private final ParkingLotDAO parkingLotDAO;
 
     public AdminPanel(ParkingLot parkingLot) {
         this(parkingLot, null, null);
@@ -59,6 +61,7 @@ public class AdminPanel extends BasePanel {
         this.dbManager = dbManager;
         this.fineDAO = fineDAO;
         this.vehicleDAO = dbManager != null ? new VehicleDAO(dbManager) : null;
+        this.parkingLotDAO = dbManager != null ? new ParkingLotDAO(dbManager) : null;
         initializeComponents();
     }
 
@@ -193,6 +196,18 @@ public class AdminPanel extends BasePanel {
         }
         
         parkingLot.changeFineStrategy(strategy);
+        
+        // Save strategy to database
+        if (parkingLotDAO != null) {
+            try {
+                parkingLotDAO.updateFineStrategy(strategy);
+            } catch (SQLException e) {
+                showError("Failed to save fine strategy to database: " + e.getMessage());
+                e.printStackTrace();
+                return;
+            }
+        }
+        
         showSuccess("Fine strategy updated successfully. New strategy will apply to future entries only.");
     }
 
@@ -202,6 +217,38 @@ public class AdminPanel extends BasePanel {
         refreshStatistics();
         refreshVehicleTable();
         refreshFineTable();
+        refreshFineStrategyCombo();
+    }
+    
+    /**
+     * Updates the fine strategy combo box to match the current parking lot strategy.
+     */
+    private void refreshFineStrategyCombo() {
+        if (parkingLot == null || fineStrategyCombo == null) {
+            return;
+        }
+        
+        FineCalculationStrategy currentStrategy = parkingLot.getFineCalculationContext().getStrategy();
+        if (currentStrategy == null) {
+            return;
+        }
+        
+        String strategyName = currentStrategy.getStrategyName();
+        int selectedIndex = 0; // Default to Fixed
+        
+        switch (strategyName.toUpperCase()) {
+            case "FIXED":
+                selectedIndex = 0;
+                break;
+            case "PROGRESSIVE":
+                selectedIndex = 1;
+                break;
+            case "HOURLY":
+                selectedIndex = 2;
+                break;
+        }
+        
+        fineStrategyCombo.setSelectedIndex(selectedIndex);
     }
 
     private void refreshFloorTable() {

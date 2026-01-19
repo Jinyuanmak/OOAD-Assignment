@@ -10,6 +10,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.university.parking.model.FineCalculationStrategy;
 import com.university.parking.model.Floor;
 import com.university.parking.model.ParkingLot;
 import com.university.parking.model.ParkingSpot;
@@ -57,7 +58,7 @@ public class ParkingLotDAO {
 
     /**
      * Loads the complete parking lot structure from the database.
-     * Includes all floors, spots, and active vehicles.
+     * Includes all floors, spots, active vehicles, and fine strategy.
      * @return fully populated ParkingLot object or null if no parking lot exists
      */
     public ParkingLot loadParkingLot() throws SQLException {
@@ -77,10 +78,14 @@ public class ParkingLotDAO {
                 Long parkingLotId = rs.getLong("id");
                 String name = rs.getString("name");
                 double totalRevenue = rs.getDouble("total_revenue");
+                String currentFineStrategy = rs.getString("current_fine_strategy");
                 
                 // Create parking lot object
                 ParkingLot parkingLot = new ParkingLot(name);
                 parkingLot.setTotalRevenue(totalRevenue);
+                
+                // Restore fine strategy from database
+                restoreFineStrategy(parkingLot, currentFineStrategy);
                 
                 // Load all floors with their spots
                 List<Floor> floors = loadFloors(parkingLotId);
@@ -96,6 +101,34 @@ public class ParkingLotDAO {
         } finally {
             dbManager.releaseConnection(conn);
         }
+    }
+    
+    /**
+     * Restores the fine calculation strategy from the database.
+     * @param parkingLot the parking lot to set the strategy for
+     * @param strategyName the strategy name from database (FIXED, PROGRESSIVE, HOURLY)
+     */
+    private void restoreFineStrategy(ParkingLot parkingLot, String strategyName) {
+        if (strategyName == null || strategyName.isEmpty()) {
+            strategyName = "FIXED"; // Default to FIXED if not set
+        }
+        
+        FineCalculationStrategy strategy;
+        switch (strategyName.toUpperCase()) {
+            case "PROGRESSIVE":
+                strategy = new com.university.parking.model.ProgressiveFineStrategy();
+                break;
+            case "HOURLY":
+                strategy = new com.university.parking.model.HourlyFineStrategy();
+                break;
+            case "FIXED":
+            default:
+                strategy = new com.university.parking.model.FixedFineStrategy();
+                break;
+        }
+        
+        parkingLot.getFineCalculationContext().setStrategy(strategy);
+        System.out.println("Restored fine strategy: " + strategyName);
     }
 
     /**
@@ -262,6 +295,28 @@ public class ParkingLotDAO {
                 int rowsUpdated = stmt.executeUpdate();
                 if (rowsUpdated > 0) {
                     System.out.println("Updated parking lot revenue to RM " + String.format("%.2f", totalRevenue));
+                }
+            }
+        } finally {
+            dbManager.releaseConnection(conn);
+        }
+    }
+    
+    /**
+     * Updates the fine calculation strategy in the database.
+     * @param strategy the fine calculation strategy to save
+     */
+    public void updateFineStrategy(FineCalculationStrategy strategy) throws SQLException {
+        String sql = "UPDATE parking_lots SET current_fine_strategy = ? LIMIT 1";
+        
+        Connection conn = null;
+        try {
+            conn = dbManager.getConnection();
+            try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.setString(1, strategy.getStrategyName());
+                int rowsUpdated = stmt.executeUpdate();
+                if (rowsUpdated > 0) {
+                    System.out.println("Updated fine strategy to: " + strategy.getStrategyName());
                 }
             }
         } finally {

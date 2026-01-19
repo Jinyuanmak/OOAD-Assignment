@@ -230,6 +230,8 @@ classDiagram
         +loadParkingLot() ParkingLot
         +saveParkingLot(ParkingLot) Long
         +updateRevenue(double)
+        +updateFineStrategy(FineCalculationStrategy)
+        -restoreFineStrategy(ParkingLot, String)
     }
 
     class FloorDAO {

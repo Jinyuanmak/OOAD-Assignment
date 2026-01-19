@@ -68,7 +68,7 @@ Download and install Laragon from: https://laragon.org/download/
 
 ### JDBC Connection URL
 ```java
-jdbc:mysql://localhost:3306/parking_lot?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+jdbc:mysql://localhost:3306/parking_lot?useSSL=false&serverTimezone=Asia/Singapore&allowPublicKeyRetrieval=true
 ```
 
 **Breakdown:**
@@ -76,16 +76,20 @@ jdbc:mysql://localhost:3306/parking_lot?useSSL=false&serverTimezone=UTC&allowPub
 - `localhost:3306` - Laragon MySQL server address
 - `parking_lot` - Database name (auto-created)
 - `useSSL=false` - Disable SSL for local development
-- `serverTimezone=UTC` - Set timezone
+- `serverTimezone=Asia/Singapore` - Set timezone to UTC+8 (Malaysia/Singapore/China)
 - `allowPublicKeyRetrieval=true` - Allow public key retrieval
+
+**Important:** Timezone is set to `Asia/Singapore` (UTC+8) for accurate elapsed time calculations in the `vehicles_with_duration` VIEW.
 
 ### Connection Settings in Code
 ```java
 // DatabaseManager.java
-private static final String DEFAULT_DB_URL = "jdbc:mysql://localhost:3306/parking_lot?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true";
+private static final String DEFAULT_DB_URL = "jdbc:mysql://localhost:3306/parking_lot?useSSL=false&serverTimezone=Asia/Singapore&allowPublicKeyRetrieval=true";
 private static final String DEFAULT_USER = "root";
 private static final String DEFAULT_PASSWORD = "";  // Laragon default: no password
 ```
+
+**Note:** Timezone is set to `Asia/Singapore` (UTC+8) to match the database timezone for accurate elapsed time tracking.
 
 ---
 
@@ -124,17 +128,22 @@ import java.sql.Timestamp;
 parking_lot
 ```
 
-### Tables (7 tables with InnoDB engine)
+### Tables (6 tables with InnoDB engine)
 
 | Table | Purpose |
 |-------|---------|
 | `parking_lots` | Parking lot configuration and revenue |
 | `floors` | Floor information |
 | `parking_spots` | Parking spot details and status |
-| `vehicles` | Vehicle records |
-| `parking_sessions` | Entry/exit sessions with tickets |
-| `fines` | Fine records |
+| `vehicles` | Vehicle records with entry/exit times |
+| `fines` | Fine records (OVERSTAY, UNPAID_BALANCE, etc.) |
 | `payments` | Payment transactions |
+
+### VIEW (Real-Time Calculation)
+
+| VIEW | Purpose |
+|------|---------|
+| `vehicles_with_duration` | Real-time elapsed time calculation (elapsed_seconds, elapsed_minutes, elapsed_hours, is_overstay) |
 
 ### Table Definitions (MySQL Syntax)
 
@@ -187,33 +196,76 @@ CREATE TABLE IF NOT EXISTS vehicles (
 ) ENGINE=InnoDB;
 ```
 
-#### 5. parking_sessions
+#### 5. vehicles_with_duration VIEW (NEW - Real-Time Tracking)
 ```sql
-CREATE TABLE IF NOT EXISTS parking_sessions (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    vehicle_id BIGINT NOT NULL,
-    spot_id VARCHAR(50) NOT NULL,
-    entry_time DATETIME NOT NULL,
-    exit_time DATETIME,
-    duration_hours INT,
-    ticket_number VARCHAR(100) NOT NULL UNIQUE,
-    FOREIGN KEY (vehicle_id) REFERENCES vehicles(id)
-) ENGINE=InnoDB;
+CREATE OR REPLACE VIEW vehicles_with_duration AS
+SELECT 
+    v.*,
+    -- Elapsed seconds
+    CASE 
+        WHEN v.exit_time IS NOT NULL THEN 
+            TIMESTAMPDIFF(SECOND, v.entry_time, v.exit_time)
+        WHEN v.entry_time IS NOT NULL THEN 
+            TIMESTAMPDIFF(SECOND, v.entry_time, CURRENT_TIMESTAMP)
+        ELSE 0
+    END as elapsed_seconds,
+    -- Elapsed minutes
+    CASE 
+        WHEN v.exit_time IS NOT NULL THEN 
+            TIMESTAMPDIFF(MINUTE, v.entry_time, v.exit_time)
+        WHEN v.entry_time IS NOT NULL THEN 
+            TIMESTAMPDIFF(MINUTE, v.entry_time, CURRENT_TIMESTAMP)
+        ELSE 0
+    END as elapsed_minutes,
+    -- Elapsed hours (used for fee calculation)
+    CASE 
+        WHEN v.exit_time IS NOT NULL THEN 
+            TIMESTAMPDIFF(HOUR, v.entry_time, v.exit_time)
+        WHEN v.entry_time IS NOT NULL THEN 
+            TIMESTAMPDIFF(HOUR, v.entry_time, CURRENT_TIMESTAMP)
+        ELSE 0
+    END as elapsed_hours,
+    -- Overstay flag (TRUE if > 24 hours)
+    CASE 
+        WHEN v.exit_time IS NOT NULL THEN 
+            TIMESTAMPDIFF(HOUR, v.entry_time, v.exit_time) > 24
+        WHEN v.entry_time IS NOT NULL THEN 
+            TIMESTAMPDIFF(HOUR, v.entry_time, CURRENT_TIMESTAMP) > 24
+        ELSE FALSE
+    END as is_overstay
+FROM vehicles v;
 ```
 
-#### 6. fines
+**Key Features of VIEW:**
+- ✅ Calculates elapsed time in real-time (no caching)
+- ✅ Timezone-aware (respects session timezone: UTC+8)
+- ✅ Automatic overstay detection (> 24 hours)
+- ✅ Used for accurate fee calculation
+- ✅ Updates automatically on every query
+
+#### 6. fines (UPDATED - New Fine Types)
 ```sql
 CREATE TABLE IF NOT EXISTS fines (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     license_plate VARCHAR(20) NOT NULL,
-    fine_type VARCHAR(30) NOT NULL,
+    fine_type VARCHAR(30) NOT NULL COMMENT 'OVERSTAY, UNPAID_BALANCE, UNAUTHORIZED_RESERVED',
     amount DECIMAL(10,2) NOT NULL,
     issued_date DATETIME NOT NULL,
-    is_paid BOOLEAN NOT NULL DEFAULT FALSE,
-    parking_session_id BIGINT,
-    FOREIGN KEY (parking_session_id) REFERENCES parking_sessions(id)
+    is_paid BOOLEAN NOT NULL DEFAULT FALSE COMMENT '1=PAID, 0=UNPAID'
 ) ENGINE=InnoDB;
 ```
+
+**Fine Types:**
+- `OVERSTAY`: Generated automatically when vehicle > 24 hours (RM 50.00)
+- `UNPAID_BALANCE`: Created when partial payment made (variable amount)
+- `UNAUTHORIZED_RESERVED`: Reserved spot violation (if implemented)
+
+**Fine Behavior:**
+- Linked to license plate (persists across sessions)
+- Automatically generated during vehicle exit lookup
+- Marked as paid after full or partial payment
+- Original fines always marked as paid (even with partial payment)
+- Unpaid balance fine created for remaining amount
 
 #### 7. payments
 ```sql
@@ -223,10 +275,8 @@ CREATE TABLE IF NOT EXISTS payments (
     parking_fee DECIMAL(10,2) NOT NULL,
     fine_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
     total_amount DECIMAL(10,2) NOT NULL,
-    payment_method VARCHAR(20) NOT NULL,
-    payment_date DATETIME NOT NULL,
-    parking_session_id BIGINT,
-    FOREIGN KEY (parking_session_id) REFERENCES parking_sessions(id)
+    payment_method VARCHAR(20) NOT NULL COMMENT 'CASH or CARD',
+    payment_date DATETIME NOT NULL
 ) ENGINE=InnoDB;
 ```
 
@@ -243,11 +293,31 @@ src/main/java/com/university/parking/dao/
 
 | File | Purpose | JDBC Classes Used |
 |------|---------|-------------------|
-| **DatabaseManager.java** | Connection pooling, schema initialization | Connection, DriverManager, Statement |
-| **VehicleDAO.java** | Vehicle CRUD operations | Connection, PreparedStatement, ResultSet, Timestamp |
+| **DatabaseManager.java** | Connection pooling, schema initialization, VIEW creation | Connection, DriverManager, Statement |
+| **VehicleDAO.java** | Vehicle CRUD operations, uses vehicles_with_duration VIEW | Connection, PreparedStatement, ResultSet, Timestamp |
 | **ParkingSpotDAO.java** | Parking spot operations | Connection, PreparedStatement, ResultSet |
-| **FineDAO.java** | Fine management | Connection, PreparedStatement, ResultSet, Timestamp |
+| **FineDAO.java** | Fine management (OVERSTAY, UNPAID_BALANCE) | Connection, PreparedStatement, ResultSet, Timestamp |
 | **PaymentDAO.java** | Payment records | Connection, PreparedStatement, ResultSet, Timestamp |
+| **ParkingLotDAO.java** | Parking lot configuration and revenue | Connection, PreparedStatement, ResultSet |
+| **FloorDAO.java** | Floor management | Connection, PreparedStatement, ResultSet |
+
+### Key DAO Features
+
+**VehicleDAO:**
+- Uses `vehicles_with_duration` VIEW for real-time elapsed time
+- Loads vehicles with `elapsed_hours` and `is_overstay` flags
+- Supports database vehicle lookup (SQL-inserted vehicles)
+
+**FineDAO:**
+- Manages OVERSTAY, UNPAID_BALANCE, and UNAUTHORIZED_RESERVED fines
+- Finds unpaid fines by license plate
+- Marks fines as paid (supports partial payment)
+- Prevents duplicate overstay fines
+
+**PaymentDAO:**
+- Records all payments (full and partial)
+- Calculates total revenue
+- Links payments to license plates
 
 ---
 
@@ -273,10 +343,37 @@ public class DatabaseManager {
 ### 2. Creating Database (MySQL Specific)
 ```java
 private void createDatabaseIfNotExists() throws SQLException {
-    String baseUrl = "jdbc:mysql://localhost:3306?useSSL=false&serverTimezone=UTC";
+    String baseUrl = "jdbc:mysql://localhost:3306?useSSL=false&serverTimezone=Asia/Singapore";
     try (Connection conn = DriverManager.getConnection(baseUrl, user, password);
          Statement stmt = conn.createStatement()) {
         stmt.execute("CREATE DATABASE IF NOT EXISTS parking_lot");
+        
+        // Set timezone for session
+        stmt.execute("SET SESSION time_zone = '+08:00'");
+    }
+}
+```
+
+### 2b. Creating VIEW for Real-Time Elapsed Time
+```java
+private void createVehiclesDurationView() throws SQLException {
+    String sql = "CREATE OR REPLACE VIEW vehicles_with_duration AS " +
+                 "SELECT v.*, " +
+                 "CASE WHEN v.exit_time IS NOT NULL THEN " +
+                 "    TIMESTAMPDIFF(HOUR, v.entry_time, v.exit_time) " +
+                 "WHEN v.entry_time IS NOT NULL THEN " +
+                 "    TIMESTAMPDIFF(HOUR, v.entry_time, CURRENT_TIMESTAMP) " +
+                 "ELSE 0 END as elapsed_hours, " +
+                 "CASE WHEN v.exit_time IS NOT NULL THEN " +
+                 "    TIMESTAMPDIFF(HOUR, v.entry_time, v.exit_time) > 24 " +
+                 "WHEN v.entry_time IS NOT NULL THEN " +
+                 "    TIMESTAMPDIFF(HOUR, v.entry_time, CURRENT_TIMESTAMP) > 24 " +
+                 "ELSE FALSE END as is_overstay " +
+                 "FROM vehicles v";
+    
+    try (Connection conn = getConnection();
+         Statement stmt = conn.createStatement()) {
+        stmt.execute(sql);
     }
 }
 ```
@@ -311,7 +408,8 @@ public Long save(Vehicle vehicle) throws SQLException {
 ### 4. SELECT with ResultSet
 ```java
 public Vehicle findByLicensePlate(String licensePlate) throws SQLException {
-    String sql = "SELECT * FROM vehicles WHERE license_plate = ?";
+    // Use VIEW to get vehicle with elapsed time
+    String sql = "SELECT * FROM vehicles_with_duration WHERE license_plate = ?";
     
     Connection conn = dbManager.getConnection();
     try (PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -319,13 +417,69 @@ public Vehicle findByLicensePlate(String licensePlate) throws SQLException {
         
         try (ResultSet rs = stmt.executeQuery()) {
             if (rs.next()) {
-                return mapResultSetToVehicle(rs);
+                Vehicle vehicle = mapResultSetToVehicle(rs);
+                // Set elapsed time fields from VIEW
+                vehicle.setElapsedHours(rs.getLong("elapsed_hours"));
+                vehicle.setIsOverstay(rs.getBoolean("is_overstay"));
+                return vehicle;
             }
         }
     } finally {
         dbManager.releaseConnection(conn);
     }
     return null;
+}
+```
+
+### 5. Overstay Fine Generation (NEW)
+```java
+public Fine checkAndGenerateOverstayFine(Vehicle vehicle, FineCalculationStrategy strategy) {
+    // Check if vehicle has overstayed (> 24 hours)
+    if (vehicle.getIsOverstay() != null && vehicle.getIsOverstay()) {
+        // Check if overstay fine already exists
+        List<Fine> existingFines = fineDAO.findUnpaidByLicensePlate(vehicle.getLicensePlate());
+        boolean hasOverstayFine = existingFines.stream()
+            .anyMatch(f -> f.getType() == FineType.OVERSTAY);
+        
+        if (!hasOverstayFine) {
+            // Generate new overstay fine (RM 50.00)
+            Fine fine = new Fine(
+                vehicle.getLicensePlate(),
+                FineType.OVERSTAY,
+                50.00,  // Fixed fine amount
+                LocalDateTime.now(),
+                false
+            );
+            fineDAO.save(fine);
+            return fine;
+        }
+    }
+    return null;
+}
+```
+
+### 6. Partial Payment Handling (NEW)
+```java
+public void processPartialPayment(String licensePlate, double amountPaid, double totalDue, List<Fine> originalFines) {
+    // Always mark original fines as paid
+    for (Fine fine : originalFines) {
+        fineDAO.markAsPaid(fine.getId());
+    }
+    
+    // Calculate remaining balance
+    double remainingBalance = totalDue - amountPaid;
+    
+    if (remainingBalance > 0) {
+        // Create unpaid balance fine
+        Fine unpaidBalanceFine = new Fine(
+            licensePlate,
+            FineType.UNPAID_BALANCE,
+            remainingBalance,
+            LocalDateTime.now(),
+            false
+        );
+        fineDAO.save(unpaidBalanceFine);
+    }
 }
 ```
 
@@ -424,9 +578,63 @@ public void releaseConnection(Connection conn) {
 | **Username** | root |
 | **Password** | (empty) |
 | **Database Name** | parking_lot |
-| **Tables** | 7 tables (InnoDB engine) |
-| **DAO Classes** | 5 classes (all using JDBC) |
+| **Tables** | 6 tables (InnoDB engine) |
+| **VIEWs** | 1 VIEW (vehicles_with_duration) |
+| **DAO Classes** | 7 classes (all using JDBC) |
 | **Connection Pool** | 10 connections |
+| **Timezone** | Asia/Singapore (UTC+8) |
+
+---
+
+## Recent Updates (January 2026)
+
+### 1. Real-Time Elapsed Time Tracking
+- Created `vehicles_with_duration` VIEW
+- Calculates elapsed_seconds, elapsed_minutes, elapsed_hours in real-time
+- Automatic overstay detection (is_overstay flag)
+- Timezone-aware (UTC+8)
+- No caching - always current
+
+### 2. Automatic Overstay Fine Generation
+- Overstay fine (RM 50.00) generated automatically during vehicle exit
+- Triggered when elapsed_hours > 24 OR is_overstay = TRUE
+- Prevents duplicate fines
+- Saved to database immediately
+
+### 3. Partial Payment Support
+- Original fines always marked as paid (even with partial payment)
+- UNPAID_BALANCE fine created for remaining amount
+- Unpaid balance persists across sessions
+- Linked to license plate (not session)
+
+### 4. Database Vehicle Lookup
+- Can find vehicles inserted via SQL (not just in-memory)
+- Uses vehicles_with_duration VIEW
+- Syncs in-memory parking lot state with database
+- Supports backdated test data
+
+### 5. Fine Types
+- **OVERSTAY**: RM 50.00 (> 24 hours)
+- **UNPAID_BALANCE**: Variable (partial payment remainder)
+- **UNAUTHORIZED_RESERVED**: RM 50.00 (if implemented)
+
+---
+
+## Database Setup Files
+
+### Location
+```
+database/database_setup.sql
+```
+
+### Usage
+1. Open phpMyAdmin or MySQL Workbench
+2. Run the SQL script: `database/database_setup.sql`
+3. Database and tables will be created automatically
+4. VIEW will be created for real-time tracking
+
+### Alternative (Automatic)
+The application creates the database automatically on first run. No manual setup required.
 
 ---
 

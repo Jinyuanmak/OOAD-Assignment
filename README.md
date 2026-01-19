@@ -152,7 +152,8 @@ parking-lot-management/
 │   └── ParkingApplication.java  # Main entry point
 ├── parking-lot-management.jar   # Executable JAR (in root)
 ├── run-parking-system.bat       # Quick launch script
-├── database_setup.sql           # Manual DB setup (optional)
+├── database/                    # Database setup files
+│   └── database_setup.sql       # Manual DB setup (optional)
 ├── pom.xml                      # Maven configuration
 ├── README.md                    # This file
 ├── USER_GUIDE.md                # Complete user manual
@@ -920,7 +921,7 @@ Developed by students of the University OOAD course.
 | **QUICK_OVERSTAY_TEST.md** | Quick overstay testing | Copy-paste SQL commands for instant overstay testing |
 | **OVERSTAY_FINE_TESTING_GUIDE.md** | Detailed overstay testing | Complete guide to test overstay fines without waiting 24 hours |
 | **UML_DIAGRAMS.md**      | System architecture        | Class diagrams, sequence diagrams, ER diagrams (Mermaid) |
-| **database_setup.sql**   | SQL setup script           | Manual database and table creation (optional)            |
+| **database/database_setup.sql** | SQL setup script    | Manual database and table creation (optional)            |
 | **pom.xml**              | Maven configuration        | Dependencies, build configuration, plugins               |
 
 ### Quick Links

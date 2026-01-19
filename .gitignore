@@ -2,6 +2,9 @@
 *.class
 target/
 
+# Receipts folder (generated files)
+receipts/
+
 # Log files
 *.log
 
