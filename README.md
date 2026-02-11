@@ -59,23 +59,26 @@ A comprehensive parking facility management system built with Java Swing and MyS
 
 ## Database Setup
 
-1. Start MySQL server
-2. Create database:
-```sql
-CREATE DATABASE parking_management;
-```
+1. Start MySQL server (e.g., via Laragon, XAMPP, or standalone MySQL)
 
-3. Run the database setup script:
-```bash
-mysql -u root -p parking_management < database/database_setup.sql
-```
+2. The application will automatically create the database on first run, or you can manually set it up:
 
-4. Update database credentials in `DatabaseManager.java` if needed:
+**Option A: Automatic Setup (Recommended)**
+- Just run the application, it will create the `parking_lot` database automatically
+
+**Option B: Manual Setup**
+- Open phpMyAdmin or MySQL Workbench
+- Run the SQL script: `database/database_setup.sql`
+- This creates the `parking_lot` database with all tables and views
+
+3. Update database credentials if needed in `DatabaseManager.java`:
 ```java
-private static final String DB_URL = "jdbc:mysql://localhost:3306/parking_management";
-private static final String DB_USER = "root";
-private static final String DB_PASSWORD = "your_password";
+private static final String DEFAULT_DB_NAME = "parking_lot";
+private static final String DEFAULT_USER = "root";
+private static final String DEFAULT_PASSWORD = "";  // Empty for Laragon/XAMPP
 ```
+
+**Note**: The system uses UTC+8 timezone (Asia/Singapore) for accurate time tracking.
 
 ## Build & Run
 
@@ -142,9 +145,14 @@ src/main/java/com/university/parking/
 
 ### Parking Lot Setup
 The system initializes with:
-- 3 floors
-- 10 spots per floor
-- Mixed spot types (Compact, Regular, Handicapped)
+- **5 floors** (Floor 1 to Floor 5)
+- **15 spots per floor** (75 total spots)
+- **3 rows per floor**:
+  - Row 1: 5 Compact spots
+  - Row 2: 5 Regular spots
+  - Row 3: 2 Handicapped + 2 Reserved + 1 Regular spot
+
+Spot ID format: `F{floor}-R{row}-S{spot}` (e.g., F1-R2-S3)
 
 Modify in `ParkingApplication.java` to customize.
 
@@ -157,9 +165,26 @@ Modify in `ParkingApplication.java` to customize.
 Modify in `SpotType.java` enum.
 
 ### Fine Strategies
-Default: Fixed (RM 50)
 
-Change via Admin panel or modify in `ParkingLot.java`.
+**Default Strategy**: Fixed (RM 50 flat fine for overstay)
+
+**Available Strategies**:
+1. **Fixed**: RM 50 flat fine regardless of overstay duration
+2. **Hourly**: RM 10 per hour of overstay
+3. **Progressive**: RM 20 base fine + RM 5 per additional hour
+
+Change strategy via Admin panel. Strategy changes only affect new entries after the change time.
+
+**Fine Types**:
+- **OVERSTAY**: Automatically issued when vehicle parks > 24 hours
+- **UNPAID_BALANCE**: Created when customer makes partial payment (pays less than total due)
+- **UNAUTHORIZED_RESERVED**: Reserved spot violation (if implemented)
+
+**Unpaid Balance Handling**:
+- If customer pays less than total due, the remaining balance becomes an UNPAID_BALANCE fine
+- Unpaid fines persist across sessions and accumulate
+- Customer must pay all unpaid fines before exiting
+- Example: Total due RM 100, customer pays RM 60 → RM 40 becomes UNPAID_BALANCE fine
 
 ## Receipts & Reports
 
