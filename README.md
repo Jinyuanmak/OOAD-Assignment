@@ -21,7 +21,7 @@ A comprehensive parking facility management system built with Java Swing and MyS
 - Multiple fine calculation strategies:
   - Fixed: RM 50 flat fine
   - Hourly: RM 10 per hour
-  - Progressive: RM 20 base + RM 5 per additional hour
+  - Progressive: RM 50 base + RM 10 per hour
 - Fine payment tracking
 
 ### Payment Processing
@@ -171,7 +171,7 @@ Modify in `SpotType.java` enum.
 **Available Strategies**:
 1. **Fixed**: RM 50 flat fine regardless of overstay duration
 2. **Hourly**: RM 10 per hour of overstay
-3. **Progressive**: RM 20 base fine + RM 5 per additional hour
+3. **Progressive**: RM 50 base fine + RM 10 per hour of overstay
 
 Change strategy via Admin panel. Strategy changes only affect new entries after the change time.
 
