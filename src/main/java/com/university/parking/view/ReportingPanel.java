@@ -4,13 +4,18 @@ import java.awt.BorderLayout;
 import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.Insets;
+import java.io.File;
+import java.io.IOException;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 
 import javax.swing.JButton;
 import javax.swing.JComboBox;
+import javax.swing.JFileChooser;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
@@ -27,6 +32,7 @@ import com.university.parking.model.ParkingSpot;
 import com.university.parking.model.ProgressiveFineStrategy;
 import com.university.parking.model.SpotType;
 import com.university.parking.model.Vehicle;
+import com.university.parking.util.ReportExporter;
 
 /**
  * Panel for generating and displaying reports.
@@ -38,8 +44,12 @@ public class ReportingPanel extends BasePanel {
     private JComboBox<String> reportTypeCombo;
     private JTextArea reportArea;
     private JButton generateButton;
+    private JButton exportTxtButton;
+    private JButton exportPdfButton;
+    private JButton exportCsvButton;
     private final DatabaseManager dbManager;
     private final FineDAO fineDAO;
+    private List<Fine> currentFines;
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     public ReportingPanel(ParkingLot parkingLot) {
@@ -50,6 +60,7 @@ public class ReportingPanel extends BasePanel {
         super(parkingLot);
         this.dbManager = dbManager;
         this.fineDAO = fineDAO;
+        this.currentFines = new ArrayList<>();
         initializeComponents();
     }
 
@@ -83,6 +94,19 @@ public class ReportingPanel extends BasePanel {
         JButton clearButton = createButton("Clear");
         clearButton.addActionListener(e -> reportArea.setText(""));
         panel.add(clearButton);
+        
+        // Export buttons
+        exportTxtButton = createButton("Export TXT");
+        exportTxtButton.addActionListener(e -> exportReport(ReportExporter.ExportFormat.TXT));
+        panel.add(exportTxtButton);
+        
+        exportPdfButton = createButton("Export PDF");
+        exportPdfButton.addActionListener(e -> exportReport(ReportExporter.ExportFormat.PDF));
+        panel.add(exportPdfButton);
+        
+        exportCsvButton = createButton("Export CSV");
+        exportCsvButton.addActionListener(e -> exportReport(ReportExporter.ExportFormat.CSV));
+        panel.add(exportCsvButton);
 
         return panel;
     }
@@ -279,9 +303,12 @@ public class ReportingPanel extends BasePanel {
         sb.append("\nOutstanding Fines:\n");
         sb.append("-".repeat(60)).append("\n");
         
+        currentFines = new ArrayList<>();
+        
         if (fineDAO != null) {
             try {
                 List<Fine> unpaidFines = fineDAO.findAllUnpaid();
+                currentFines = unpaidFines;
                 
                 if (unpaidFines.isEmpty()) {
                     sb.append("No outstanding fines.\n");
@@ -318,6 +345,68 @@ public class ReportingPanel extends BasePanel {
         sb.append("\n").append("=".repeat(60));
 
         reportArea.setText(sb.toString());
+    }
+    
+    /**
+     * Exports the current report to the specified format.
+     */
+    private void exportReport(ReportExporter.ExportFormat format) {
+        if (reportArea.getText().trim().isEmpty()) {
+            showError("Please generate a report first before exporting");
+            return;
+        }
+        
+        // Get report type
+        int selectedIndex = reportTypeCombo.getSelectedIndex();
+        ReportExporter.ReportType reportType;
+        
+        switch (selectedIndex) {
+            case 0:
+                reportType = ReportExporter.ReportType.VEHICLE;
+                break;
+            case 1:
+                reportType = ReportExporter.ReportType.REVENUE;
+                break;
+            case 2:
+                reportType = ReportExporter.ReportType.OCCUPANCY;
+                break;
+            case 3:
+                reportType = ReportExporter.ReportType.FINE;
+                break;
+            default:
+                showError("Please select a report type");
+                return;
+        }
+        
+        // Choose save location
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setDialogTitle("Save Report");
+        fileChooser.setSelectedFile(new File(reportType.getFileName() + format.getExtension()));
+        
+        int userSelection = fileChooser.showSaveDialog(this);
+        
+        if (userSelection == JFileChooser.APPROVE_OPTION) {
+            File selectedFile = fileChooser.getSelectedFile();
+            String directory = selectedFile.getParent();
+            
+            try {
+                File exportedFile = ReportExporter.exportReport(
+                    reportType, 
+                    format, 
+                    parkingLot, 
+                    currentFines, 
+                    directory
+                );
+                
+                JOptionPane.showMessageDialog(this,
+                    "Report exported successfully to:\n" + exportedFile.getAbsolutePath(),
+                    "Export Successful",
+                    JOptionPane.INFORMATION_MESSAGE);
+                    
+            } catch (IOException e) {
+                showError("Failed to export report: " + e.getMessage());
+            }
+        }
     }
 
     @Override

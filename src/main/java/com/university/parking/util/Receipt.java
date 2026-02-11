@@ -20,6 +20,7 @@ public class Receipt {
     private double totalAmount;
     private double amountPaid;
     private double remainingBalance;
+    private double changeAmount;
     private PaymentMethod paymentMethod;
     private LocalDateTime paymentDate;
     private String spotId;
@@ -39,6 +40,7 @@ public class Receipt {
         this.totalAmount = parkingFee + fineAmount;
         this.amountPaid = amountPaid;
         this.remainingBalance = Math.max(0, totalAmount - amountPaid);
+        this.changeAmount = Math.max(0, amountPaid - totalAmount);
         this.paymentMethod = paymentMethod;
         this.paymentDate = LocalDateTime.now();
         this.spotId = spotId;
@@ -86,6 +88,9 @@ public class Receipt {
         
         if (remainingBalance > 0) {
             receipt.append(String.format("BALANCE DUE   : RM %.2f\n", remainingBalance));
+        } else if (changeAmount > 0) {
+            receipt.append(String.format("CHANGE        : RM %.2f\n", changeAmount));
+            receipt.append("Status        : PAID IN FULL\n");
         } else {
             receipt.append("Status        : PAID IN FULL\n");
         }
@@ -138,6 +143,10 @@ public class Receipt {
 
     public double getRemainingBalance() {
         return remainingBalance;
+    }
+
+    public double getChangeAmount() {
+        return changeAmount;
     }
 
     public PaymentMethod getPaymentMethod() {

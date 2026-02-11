@@ -90,7 +90,7 @@
                 </configuration>
             </plugin>
 
-            <!-- Maven JAR Plugin to create executable JAR -->
+            <!-- Maven JAR Plugin to create base JAR -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
@@ -122,6 +122,32 @@
                                 </transformer>
                             </transformers>
                             <finalName>parking-lot-management</finalName>
+                            <outputDirectory>${project.basedir}</outputDirectory>
+                            <shadedArtifactAttached>false</shadedArtifactAttached>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            
+            <!-- Maven AntRun Plugin to delete extra JAR files -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <delete quiet="true">
+                                    <fileset dir="${project.basedir}" includes="original-*.jar,*-shaded.jar,dependency-reduced-pom.xml"/>
+                                    <fileset dir="${project.build.directory}" includes="*.jar"/>
+                                </delete>
+                            </target>
                         </configuration>
                     </execution>
                 </executions>

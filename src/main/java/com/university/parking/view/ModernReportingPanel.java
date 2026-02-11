@@ -8,13 +8,18 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Insets;
 import java.awt.RenderingHints;
+import java.io.File;
+import java.io.IOException;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 
 import javax.swing.BorderFactory;
+import javax.swing.JFileChooser;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
@@ -32,6 +37,7 @@ import com.university.parking.model.ParkingSpot;
 import com.university.parking.model.ProgressiveFineStrategy;
 import com.university.parking.model.SpotType;
 import com.university.parking.model.Vehicle;
+import com.university.parking.util.ReportExporter;
 
 /**
  * Modern reporting panel with styled components.
@@ -45,10 +51,14 @@ public class ModernReportingPanel extends BasePanel {
     private JTextArea reportArea;
     private StyledButton generateButton;
     private StyledButton clearButton;
+    private StyledButton exportTxtButton;
+    private StyledButton exportPdfButton;
+    private StyledButton exportCsvButton;
     
     @SuppressWarnings("unused")
     private final DatabaseManager dbManager;
     private final FineDAO fineDAO;
+    private List<Fine> currentFines;
     
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
@@ -60,6 +70,7 @@ public class ModernReportingPanel extends BasePanel {
         super(parkingLot);
         this.dbManager = dbManager;
         this.fineDAO = fineDAO;
+        this.currentFines = new ArrayList<>();
         initializeComponents();
     }
 
@@ -119,6 +130,19 @@ public class ModernReportingPanel extends BasePanel {
         clearButton = new StyledButton("Clear", ThemeManager.TEXT_SECONDARY);
         clearButton.addActionListener(e -> reportArea.setText(""));
         controlsPanel.add(clearButton);
+        
+        // Export buttons
+        exportTxtButton = new StyledButton("Export TXT", ThemeManager.PRIMARY);
+        exportTxtButton.addActionListener(e -> exportReport(ReportExporter.ExportFormat.TXT));
+        controlsPanel.add(exportTxtButton);
+        
+        exportPdfButton = new StyledButton("Export PDF", ThemeManager.PRIMARY);
+        exportPdfButton.addActionListener(e -> exportReport(ReportExporter.ExportFormat.PDF));
+        controlsPanel.add(exportPdfButton);
+        
+        exportCsvButton = new StyledButton("Export CSV", ThemeManager.PRIMARY);
+        exportCsvButton.addActionListener(e -> exportReport(ReportExporter.ExportFormat.CSV));
+        controlsPanel.add(exportCsvButton);
         
         panel.add(controlsPanel, BorderLayout.CENTER);
         
@@ -335,9 +359,12 @@ public class ModernReportingPanel extends BasePanel {
         sb.append("\nOutstanding Fines:\n");
         sb.append("─".repeat(60)).append("\n");
         
+        currentFines = new ArrayList<>();
+        
         if (fineDAO != null) {
             try {
                 List<Fine> unpaidFines = fineDAO.findAllUnpaid();
+                currentFines = unpaidFines;
                 
                 if (unpaidFines.isEmpty()) {
                     sb.append("No outstanding fines.\n");
@@ -374,6 +401,68 @@ public class ModernReportingPanel extends BasePanel {
         sb.append("\n").append("═".repeat(60));
 
         reportArea.setText(sb.toString());
+    }
+    
+    /**
+     * Exports the current report to the specified format.
+     */
+    private void exportReport(ReportExporter.ExportFormat format) {
+        if (reportArea.getText().trim().isEmpty()) {
+            StyledDialog.showError(this, "Please generate a report first before exporting");
+            return;
+        }
+        
+        // Get report type
+        int selectedIndex = reportTypeCombo.getSelectedIndex();
+        ReportExporter.ReportType reportType;
+        
+        switch (selectedIndex) {
+            case 0:
+                reportType = ReportExporter.ReportType.VEHICLE;
+                break;
+            case 1:
+                reportType = ReportExporter.ReportType.REVENUE;
+                break;
+            case 2:
+                reportType = ReportExporter.ReportType.OCCUPANCY;
+                break;
+            case 3:
+                reportType = ReportExporter.ReportType.FINE;
+                break;
+            default:
+                StyledDialog.showError(this, "Please select a report type");
+                return;
+        }
+        
+        // Choose save location
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setDialogTitle("Save Report");
+        fileChooser.setSelectedFile(new File(reportType.getFileName() + format.getExtension()));
+        
+        int userSelection = fileChooser.showSaveDialog(this);
+        
+        if (userSelection == JFileChooser.APPROVE_OPTION) {
+            File selectedFile = fileChooser.getSelectedFile();
+            String directory = selectedFile.getParent();
+            
+            try {
+                File exportedFile = ReportExporter.exportReport(
+                    reportType, 
+                    format, 
+                    parkingLot, 
+                    currentFines, 
+                    directory
+                );
+                
+                JOptionPane.showMessageDialog(this,
+                    "Report exported successfully to:\n" + exportedFile.getAbsolutePath(),
+                    "Export Successful",
+                    JOptionPane.INFORMATION_MESSAGE);
+                    
+            } catch (IOException e) {
+                StyledDialog.showError(this, "Failed to export report: " + e.getMessage());
+            }
+        }
     }
 
 

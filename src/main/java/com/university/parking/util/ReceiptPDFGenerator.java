@@ -173,14 +173,29 @@ public class ReceiptPDFGenerator {
                     contentStream.newLineAtOffset(margin, yPosition);
                     contentStream.showText(String.format("BALANCE DUE: RM %.2f", receipt.getRemainingBalance()));
                     contentStream.endText();
+                    yPosition -= leading;
+                } else if (receipt.getChangeAmount() > 0) {
+                    contentStream.setFont(PDType1Font.HELVETICA_BOLD, 12);
+                    contentStream.beginText();
+                    contentStream.newLineAtOffset(margin, yPosition);
+                    contentStream.showText(String.format("CHANGE: RM %.2f", receipt.getChangeAmount()));
+                    contentStream.endText();
+                    yPosition -= leading;
+                    
+                    contentStream.setFont(PDType1Font.HELVETICA_BOLD, 12);
+                    contentStream.beginText();
+                    contentStream.newLineAtOffset(margin, yPosition);
+                    contentStream.showText("Status: PAID IN FULL");
+                    contentStream.endText();
+                    yPosition -= leading;
                 } else {
                     contentStream.setFont(PDType1Font.HELVETICA_BOLD, 12);
                     contentStream.beginText();
                     contentStream.newLineAtOffset(margin, yPosition);
                     contentStream.showText("Status: PAID IN FULL");
                     contentStream.endText();
+                    yPosition -= leading;
                 }
-                yPosition -= leading;
                 
                 contentStream.setFont(PDType1Font.HELVETICA, fontSize);
                 contentStream.beginText();

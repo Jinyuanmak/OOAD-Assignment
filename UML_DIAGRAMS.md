@@ -1,22 +1,17 @@
-# UML Diagrams - Parking Lot Management System
-
-This document contains UML diagrams representing the actual system architecture using Mermaid syntax.
+# University Parking Lot Management System - UML Diagrams
 
 ## Table of Contents
-1. [Class Diagram - Model Layer](#1-class-diagram---model-layer)
-2. [Class Diagram - DAO Layer](#2-class-diagram---dao-layer)
-3. [Class Diagram - View Layer](#3-class-diagram---view-layer)
-4. [Class Diagram - Controller & Utility](#4-class-diagram---controller--utility)
-5. [Use Case Diagram](#5-use-case-diagram)
-6. [Sequence Diagram - Vehicle Entry](#6-sequence-diagram---vehicle-entry)
-7. [Sequence Diagram - Vehicle Exit & Payment](#7-sequence-diagram---vehicle-exit--payment)
-8. [Component Diagram](#8-component-diagram)
-9. [Package Diagram](#9-package-diagram)
-10. [Entity Relationship Diagram](#10-entity-relationship-diagram-database)
+1. [Class Diagram](#class-diagram)
+2. [Sequence Diagrams](#sequence-diagrams)
+3. [State Diagram](#state-diagram)
+4. [Use Case Diagram](#use-case-diagram)
+5. [Architecture Overview](#architecture-overview)
 
 ---
 
-## 1. Class Diagram - Model Layer
+## Class Diagram
+
+### Core Domain Model
 
 ```mermaid
 classDiagram
@@ -29,14 +24,14 @@ classDiagram
         +addFloor(Floor)
         +createFloor(int, List~RowConfiguration~) Floor
         +getAllSpots() List~ParkingSpot~
-        +validateUniqueSpotIds() boolean
-        +validateSpotIdFormat() boolean
         +findAvailableSpots(VehicleType) List~ParkingSpot~
         +findSpotById(String) ParkingSpot
-        +addRevenue(double)
+        +validateUniqueSpotIds() boolean
+        +validateSpotIdFormat() boolean
         +changeFineStrategy(FineCalculationStrategy)
+        +addRevenue(double)
     }
-
+    
     class Floor {
         -int floorNumber
         -List~List~ParkingSpot~~ rows
@@ -47,7 +42,7 @@ classDiagram
         +findSpotById(String) ParkingSpot
         +generateSpotId(int, int, int)$ String
     }
-
+    
     class ParkingSpot {
         -String spotId
         -SpotType type
@@ -56,10 +51,10 @@ classDiagram
         -double hourlyRate
         +isAvailable() boolean
         +occupySpot(Vehicle)
-        +assignVehicle(Vehicle)
         +vacateSpot()
+        +assignVehicle(Vehicle)
     }
-
+    
     class Vehicle {
         -String licensePlate
         -VehicleType type
@@ -73,16 +68,8 @@ classDiagram
         -Boolean isOverstay
         +calculateParkingDuration() long
         +canParkInSpot(SpotType) boolean
-        +getElapsedSeconds() Long
-        +getElapsedMinutes() Long
-        +getElapsedHours() Long
-        +getIsOverstay() Boolean
-        +setElapsedSeconds(Long)
-        +setElapsedMinutes(Long)
-        +setElapsedHours(Long)
-        +setIsOverstay(Boolean)
     }
-
+    
     class Fine {
         -Long id
         -String licensePlate
@@ -92,7 +79,7 @@ classDiagram
         -boolean isPaid
         +calculateFineAmount(FineCalculationStrategy, long) double
     }
-
+    
     class Payment {
         -Long id
         -String licensePlate
@@ -103,17 +90,36 @@ classDiagram
         -LocalDateTime paymentDate
         -Long parkingSessionId
     }
-
+    
     class ParkingSession {
         -Long id
-        -Long vehicleId
+        -String licensePlate
         -String spotId
         -LocalDateTime entryTime
         -LocalDateTime exitTime
-        -Integer durationHours
-        -String ticketNumber
+        -double parkingFee
+        -double fineAmount
+        -double totalAmount
     }
+    
+    ParkingLot "1" *-- "1..*" Floor : contains
+    Floor "1" *-- "*" ParkingSpot : contains
+    ParkingSpot "1" o-- "0..1" Vehicle : parks
+```
 
+### Enumerations
+
+```mermaid
+classDiagram
+    class SpotType {
+        <<enumeration>>
+        COMPACT
+        REGULAR
+        HANDICAPPED
+        RESERVED
+        +getHourlyRate() double
+    }
+    
     class VehicleType {
         <<enumeration>>
         MOTORCYCLE
@@ -121,61 +127,61 @@ classDiagram
         SUV_TRUCK
         HANDICAPPED
     }
-
-    class SpotType {
-        <<enumeration>>
-        COMPACT
-        REGULAR
-        HANDICAPPED
-        RESERVED
-        -double hourlyRate
-        +getHourlyRate() double
-    }
-
+    
     class SpotStatus {
         <<enumeration>>
         AVAILABLE
         OCCUPIED
+        RESERVED
+        MAINTENANCE
     }
-
+    
     class FineType {
         <<enumeration>>
         OVERSTAY
-        UNAUTHORIZED_RESERVED
-        UNPAID_BALANCE
+        UNAUTHORIZED_PARKING
+        EXPIRED_PERMIT
     }
-
+    
     class PaymentMethod {
         <<enumeration>>
         CASH
-        CARD
+        CREDIT_CARD
+        DEBIT_CARD
+        EWALLET
+        ONLINE_BANKING
     }
+```
 
+### Strategy Pattern - Fine Calculation
+
+```mermaid
+classDiagram
     class FineCalculationStrategy {
         <<interface>>
         +calculateFine(long) double
         +getStrategyName() String
     }
-
+    
     class FixedFineStrategy {
-        -double FIXED_FINE_AMOUNT$
+        -double FIXED_FINE_AMOUNT = 50.0
         +calculateFine(long) double
         +getStrategyName() String
     }
-
+    
     class HourlyFineStrategy {
-        -double HOURLY_RATE$
+        -double HOURLY_RATE = 10.0
         +calculateFine(long) double
         +getStrategyName() String
     }
-
+    
     class ProgressiveFineStrategy {
-        -double BASE_FINE$
-        -double ESCALATION_RATE$
+        -double BASE_FINE = 20.0
+        -double ADDITIONAL_RATE = 5.0
         +calculateFine(long) double
         +getStrategyName() String
     }
-
+    
     class FineCalculationContext {
         -FineCalculationStrategy strategy
         +setStrategy(FineCalculationStrategy)
@@ -183,1023 +189,726 @@ classDiagram
         +calculateFine(long) double
         +getCurrentStrategyName() String
     }
-
-    ParkingLot "1" *-- "many" Floor : contains
-    Floor "1" *-- "many" ParkingSpot : contains
-    ParkingSpot "1" o-- "0..1" Vehicle : parks
-    ParkingSpot -- SpotType
-    ParkingSpot -- SpotStatus
-    Vehicle -- VehicleType
-    Fine -- FineType
-    Payment -- PaymentMethod
     
-    ParkingLot --> FineCalculationContext : uses
-    FineCalculationContext --> FineCalculationStrategy : uses
-    FineCalculationStrategy <|.. FixedFineStrategy
-    FineCalculationStrategy <|.. HourlyFineStrategy
-    FineCalculationStrategy <|.. ProgressiveFineStrategy
+    FineCalculationStrategy <|.. FixedFineStrategy : implements
+    FineCalculationStrategy <|.. HourlyFineStrategy : implements
+    FineCalculationStrategy <|.. ProgressiveFineStrategy : implements
+    FineCalculationContext o-- FineCalculationStrategy : uses
 ```
 
----
-
-## 2. Class Diagram - DAO Layer
+### DAO Layer
 
 ```mermaid
 classDiagram
     class DatabaseManager {
-        -String databaseName
-        -String dbUrl
-        -String user
-        -String password
-        -int poolSize
-        -BlockingQueue~Connection~ connectionPool
-        -boolean initialized
-        +initializeDatabase()
+        -Connection connection
+        -String DB_URL
+        -String DB_USER
+        -String DB_PASSWORD
         +getConnection() Connection
-        +releaseConnection(Connection)
-        +shutdown()
-        +isInitialized() boolean
+        +closeConnection()
+        +initializeDatabase()
+        +testConnection() boolean
     }
-
-    class ParkingLotDAO {
-        -DatabaseManager dbManager
-        -FloorDAO floorDAO
-        -ParkingSpotDAO spotDAO
-        -VehicleDAO vehicleDAO
-        +parkingLotExists() boolean
-        +loadParkingLot() ParkingLot
-        +saveParkingLot(ParkingLot) Long
-        +updateRevenue(double)
-        +updateFineStrategy(FineCalculationStrategy)
-        -restoreFineStrategy(ParkingLot, String)
-    }
-
-    class FloorDAO {
-        -DatabaseManager dbManager
-        +save(Long, Floor) Long
-        +findByParkingLotId(Long) List~Floor~
-        +getFloorId(Long, int) Long
-        +findById(Long) Floor
-        +delete(Long)
-    }
-
-    class ParkingSpotDAO {
-        -DatabaseManager dbManager
-        +save(Long, ParkingSpot) Long
-        +findById(Long) ParkingSpot
-        +findBySpotId(String) ParkingSpot
-        +findAvailable() List~ParkingSpot~
-        +findByFloorId(Long) List~ParkingSpot~
-        +update(String, ParkingSpot)
-        +updateStatus(String, SpotStatus)
-        +delete(Long)
-        +findAll() List~ParkingSpot~
-    }
-
+    
     class VehicleDAO {
         -DatabaseManager dbManager
-        +save(Vehicle) Long
-        +findById(Long) Vehicle
+        +save(Vehicle) boolean
         +findByLicensePlate(String) Vehicle
-        +findCurrentlyParked() List~Vehicle~
-        +findActiveVehicles() List~Vehicle~
-        +findActiveBySpotId(String) Vehicle
-        +update(Long, Vehicle)
-        +updateExitTime(String, LocalDateTime)
-        +delete(Long)
         +findAll() List~Vehicle~
+        +update(Vehicle) boolean
+        +delete(String) boolean
+        +findCurrentVehicles() List~Vehicle~
     }
-
+    
+    class ParkingSpotDAO {
+        -DatabaseManager dbManager
+        +save(ParkingSpot) boolean
+        +findById(String) ParkingSpot
+        +findAll() List~ParkingSpot~
+        +update(ParkingSpot) boolean
+        +delete(String) boolean
+    }
+    
+    class FloorDAO {
+        -DatabaseManager dbManager
+        +save(Floor) boolean
+        +findById(Long) Floor
+        +findAll() List~Floor~
+        +update(Floor) boolean
+        +delete(Long) boolean
+    }
+    
     class FineDAO {
         -DatabaseManager dbManager
-        +save(Fine) Long
-        +findById(Long) Fine
-        +findUnpaidByLicensePlate(String) List~Fine~
+        +save(Fine) boolean
         +findByLicensePlate(String) List~Fine~
-        +findAllUnpaid() List~Fine~
-        +update(Long, Fine)
-        +markAsPaid(Long)
-        +delete(Long)
-        +findAll() List~Fine~
+        +findUnpaid(String) List~Fine~
+        +update(Fine) boolean
+        +delete(Long) boolean
+        +markAsPaid(Long) boolean
     }
-
+    
     class PaymentDAO {
         -DatabaseManager dbManager
-        +save(Payment) Long
-        +findById(Long) Payment
+        +save(Payment) boolean
         +findByLicensePlate(String) List~Payment~
         +findAll() List~Payment~
-        +calculateTotalRevenue() double
-        +update(Long, Payment)
-        +delete(Long)
+        +update(Payment) boolean
+        +delete(Long) boolean
     }
-
-    DatabaseManager <.. ParkingLotDAO : uses
-    DatabaseManager <.. FloorDAO : uses
-    DatabaseManager <.. ParkingSpotDAO : uses
-    DatabaseManager <.. VehicleDAO : uses
-    DatabaseManager <.. FineDAO : uses
-    DatabaseManager <.. PaymentDAO : uses
     
-    ParkingLotDAO --> FloorDAO : uses
-    ParkingLotDAO --> ParkingSpotDAO : uses
-    ParkingLotDAO --> VehicleDAO : uses
+    class ParkingLotDAO {
+        -DatabaseManager dbManager
+        +save(ParkingLot) boolean
+        +load() ParkingLot
+        +update(ParkingLot) boolean
+    }
+    
+    VehicleDAO ..> DatabaseManager : uses
+    ParkingSpotDAO ..> DatabaseManager : uses
+    FloorDAO ..> DatabaseManager : uses
+    FineDAO ..> DatabaseManager : uses
+    PaymentDAO ..> DatabaseManager : uses
+    ParkingLotDAO ..> DatabaseManager : uses
 ```
 
----
-
-## 3. Class Diagram - View Layer
-
-```mermaid
-classDiagram
-    class ThemeManager {
-        <<utility>>
-        +Color PRIMARY$
-        +Color PRIMARY_DARK$
-        +Color PRIMARY_LIGHT$
-        +Color SUCCESS$
-        +Color WARNING$
-        +Color DANGER$
-        +Color INFO$
-        +Color BG_DARK$
-        +Color BG_LIGHT$
-        +Color BG_WHITE$
-        +Color BG_CARD$
-        +Color TEXT_PRIMARY$
-        +Color TEXT_SECONDARY$
-        +Color TEXT_LIGHT$
-        +Font FONT_TITLE$
-        +Font FONT_HEADER$
-        +Font FONT_SUBHEADER$
-        +Font FONT_BODY$
-        +Font FONT_SMALL$
-        +int SIDEBAR_WIDTH$
-        +int HEADER_HEIGHT$
-        +int STATUS_BAR_HEIGHT$
-        +int CARD_PADDING$
-        +int BORDER_RADIUS$
-    }
-
-    class ModernMainFrame {
-        -HeaderPanel headerPanel
-        -SideNavigationPanel sideNavPanel
-        -JPanel contentPanel
-        -CardLayout cardLayout
-        -StatusBarPanel statusBarPanel
-        -AdminPanel adminPanel
-        -VehicleEntryPanel entryPanel
-        -VehicleExitPanel exitPanel
-        -ReportingPanel reportingPanel
-        -ParkingLot parkingLot
-        -DatabaseManager dbManager
-        -FineDAO fineDAO
-        +showPanel(String)
-        +refreshAllPanels()
-        +cleanup()
-    }
-
-    class HeaderPanel {
-        -JLabel logoLabel
-        -JLabel titleLabel
-        -JLabel dateTimeLabel
-        -Timer dateTimeTimer
-        -updateDateTime()
-        +stopTimer()
-        +getHeaderBackground() Color
-    }
-
-    class SideNavigationPanel {
-        -List~NavButton~ navButtons
-        -NavButton activeButton
-        -ActionListener navigationListener
-        +setActiveButton(int)
-        +setActiveButton(String)
-        +getActiveButton() NavButton
-    }
-
-    class NavButton {
-        -String text
-        -String icon
-        -boolean active
-        -boolean hovered
-        +setActive(boolean)
-        +isActive() boolean
-        +getCurrentBackgroundColor() Color
-    }
-
-    class StatusBarPanel {
-        -ParkingLot parkingLot
-        -JLabel connectionStatusLabel
-        -JLabel vehicleCountLabel
-        -JLabel occupancyRateLabel
-        -Timer updateTimer
-        -boolean connected
-        +updateStatus()
-        +setConnected()
-        +setDisconnected()
-        +getDisplayedVehicleCount() int
-        +getDisplayedOccupancyRate() double
-        +stopTimer()
-    }
-
-    class BasePanel {
-        <<abstract>>
-        #ParkingLot parkingLot
-        +refreshData()*
-        #createButton(String) StyledButton
-        #createTextField(int) StyledTextField
-        #createStyledTable() StyledTable
-        #showError(String)
-        #showSuccess(String)
-        #showInfo(String)
-        #showConfirm(String) boolean
-        #validateNotEmpty(JTextField, String) boolean
-        #validateLicensePlate(String) boolean
-    }
-
-    class AdminPanel {
-        -DatabaseManager dbManager
-        -FineDAO fineDAO
-        +refreshData()
-    }
-
-    class VehicleEntryPanel {
-        -DatabaseManager dbManager
-        -FineDAO fineDAO
-        +refreshData()
-    }
-
-    class VehicleExitPanel {
-        -DatabaseManager dbManager
-        -FineDAO fineDAO
-        +refreshData()
-    }
-
-    class ReportingPanel {
-        -DatabaseManager dbManager
-        -FineDAO fineDAO
-        +refreshData()
-    }
-
-    class StyledButton {
-        -Color normalColor
-        -Color hoverColor
-        -Color pressedColor
-        -Color textColor
-        -int borderRadius
-        -boolean isHovered
-        -boolean isPressed
-        +setBorderRadius(int)
-        +setNormalColor(Color)
-        +setTextColor(Color)
-        #paintComponent(Graphics)
-    }
-
-    class StyledTextField {
-        -Color borderColor
-        -Color focusBorderColor
-        -int borderRadius
-        -boolean hasFocus
-        +setBorderRadius(int)
-        +setBorderColor(Color)
-        +setFocusBorderColor(Color)
-        #paintComponent(Graphics)
-        #paintBorder(Graphics)
-    }
-
-    class StyledTable {
-        -Color evenRowColor
-        -Color oddRowColor
-        -Color hoverColor
-        -Color headerColor
-        -int hoveredRow
-        +setEvenRowColor(Color)
-        +setOddRowColor(Color)
-        +setHoverColor(Color)
-        +prepareRenderer() Component
-    }
-
-    class StyledComboBox~E~ {
-        +StyledComboBox()
-        +StyledComboBox(E[])
-        +StyledComboBox(ComboBoxModel~E~)
-    }
-
-    class DashboardCard {
-        -String title
-        -String value
-        -Color accentColor
-        -Icon icon
-        -JLabel titleLabel
-        -JLabel valueLabel
-        -JLabel iconLabel
-        +setValue(String)
-        +setIcon(Icon)
-        +setTitle(String)
-        +setAccentColor(Color)
-        #paintComponent(Graphics)
-    }
-
-    class StyledDialog {
-        <<enumeration>> DialogType
-        -DialogType dialogType
-        -Color accentColor
-        -boolean confirmed
-        +showSuccess(Component, String)$
-        +showError(Component, String)$
-        +showWarning(Component, String)$
-        +showInfo(Component, String)$
-        +showConfirm(Component, String)$ boolean
-        +getAccentColor() Color
-        +isConfirmed() boolean
-    }
-
-    ModernMainFrame *-- HeaderPanel
-    ModernMainFrame *-- SideNavigationPanel
-    ModernMainFrame *-- StatusBarPanel
-    ModernMainFrame *-- AdminPanel
-    ModernMainFrame *-- VehicleEntryPanel
-    ModernMainFrame *-- VehicleExitPanel
-    ModernMainFrame *-- ReportingPanel
-
-    SideNavigationPanel *-- NavButton
-
-    BasePanel <|-- AdminPanel
-    BasePanel <|-- VehicleEntryPanel
-    BasePanel <|-- VehicleExitPanel
-    BasePanel <|-- ReportingPanel
-
-    BasePanel ..> StyledButton : creates
-    BasePanel ..> StyledTextField : creates
-    BasePanel ..> StyledTable : creates
-    BasePanel ..> StyledDialog : uses
-
-    AdminPanel ..> DashboardCard : uses
-    AdminPanel ..> StyledTable : uses
-
-    ThemeManager <.. ModernMainFrame : uses
-    ThemeManager <.. StyledButton : uses
-    ThemeManager <.. StyledTextField : uses
-    ThemeManager <.. StyledTable : uses
-    ThemeManager <.. DashboardCard : uses
-    ThemeManager <.. HeaderPanel : uses
-    ThemeManager <.. StatusBarPanel : uses
-```
-
----
-
-## 4. Class Diagram - Controller & Utility
+### Controller Layer
 
 ```mermaid
 classDiagram
     class VehicleEntryController {
         -ParkingLot parkingLot
-        -DatabaseManager dbManager
         -VehicleDAO vehicleDAO
         -ParkingSpotDAO spotDAO
-        +findAvailableSpots(VehicleType) List~ParkingSpot~
-        +findAvailableSpotsForVehicle(Vehicle) List~ParkingSpot~
-        +processEntry(String, VehicleType, boolean, String) EntryResult
-        +generateTicket(String, LocalDateTime) String
+        +processEntry(String, VehicleType, boolean, String) boolean
+        +findAvailableSpot(VehicleType) ParkingSpot
+        +validateEntry(String, String) String
     }
-
-    class EntryResult {
-        -Vehicle vehicle
-        -ParkingSpot spot
-        -ParkingSession session
-        -String ticketNumber
-        +getTicketDisplay() String
-    }
-
+    
     class VehicleExitController {
         -ParkingLot parkingLot
-        -DatabaseManager dbManager
-        -FineDAO fineDAO
-        -FineManager fineManager
-        -PaymentDAO paymentDAO
-        -ParkingSpotDAO spotDAO
         -VehicleDAO vehicleDAO
-        -ParkingLotDAO parkingLotDAO
-        -List~Fine~ unpaidFines
-        +lookupVehicle(String) VehicleLookupResult
-        +generatePaymentSummary(String, List~Fine~) PaymentSummary
-        +processExit(String, double, PaymentMethod, List~Fine~) ExitResult
-        +getUnpaidFines(String) List~Fine~
-        +addUnpaidFine(Fine)
+        -ParkingSpotDAO spotDAO
+        -FineDAO fineDAO
+        -PaymentDAO paymentDAO
+        -FineManager fineManager
+        -PaymentProcessor paymentProcessor
+        +processExit(String, double, PaymentMethod) ExitSummary
+        +calculateExitSummary(String) ExitSummary
+        +validateExit(String) String
     }
+    
+    VehicleEntryController ..> VehicleDAO : uses
+    VehicleEntryController ..> ParkingSpotDAO : uses
+    VehicleExitController ..> VehicleDAO : uses
+    VehicleExitController ..> ParkingSpotDAO : uses
+    VehicleExitController ..> FineDAO : uses
+    VehicleExitController ..> PaymentDAO : uses
+```
 
-    class VehicleLookupResult {
-        -Vehicle vehicle
-        -ParkingSpot spot
-    }
+### Utility Layer
 
-    class PaymentSummary {
-        -Vehicle vehicle
-        -ParkingSpot spot
-        -long durationHours
-        -double parkingFee
-        -List~Fine~ unpaidFines
-        -double totalFines
-        -double totalDue
-        +getDisplayText() String
-    }
-
-    class ExitResult {
-        -PaymentSummary summary
-        -Payment payment
-        -Receipt receipt
-        -boolean paymentSufficient
-        -double remainingBalance
-    }
-
+```mermaid
+classDiagram
     class FeeCalculator {
-        <<utility>>
-        +calculateParkingFee(Vehicle, ParkingSpot, long)$ double
-        +calculateTotalAmount(double, double)$ double
+        +calculateFee(ParkingSpot, LocalDateTime, LocalDateTime)$ double
+        +calculateDuration(LocalDateTime, LocalDateTime)$ long
     }
-
+    
     class FineManager {
         -FineDAO fineDAO
-        +checkAndGenerateOverstayFine(Vehicle, FineCalculationStrategy) Fine
-        +checkAndGenerateUnauthorizedReservedFine(String, SpotType, boolean, FineCalculationStrategy) Fine
-        +generateFines(Vehicle, SpotType, boolean, FineCalculationStrategy) List~Fine~
-        +saveFine(Fine) Long
+        -ParkingLot parkingLot
+        +checkAndIssueFine(Vehicle) Fine
         +getUnpaidFines(String) List~Fine~
-        +markFinesAsPaid(List~Long~)
-        +calculateTotalUnpaidFines(String) double
+        +payFine(Long) boolean
     }
-
+    
     class PaymentProcessor {
-        <<utility>>
-        +validatePayment(double, double)$ boolean
-        +calculateRemainingBalance(double, double)$ double
-        +processPayment(String, double, double, double, PaymentMethod)$ Payment
-        +generateReceipt(...)$ Receipt
-        +isValidPaymentMethod(PaymentMethod)$ boolean
+        -PaymentDAO paymentDAO
+        +processPayment(String, double, double, PaymentMethod) Payment
+        +validatePayment(double, double) boolean
     }
-
+    
     class Receipt {
+        -String receiptId
         -String licensePlate
+        -String spotId
         -LocalDateTime entryTime
         -LocalDateTime exitTime
-        -long durationHours
         -double parkingFee
         -double fineAmount
-        -double totalAmount
+        -double totalDue
         -double amountPaid
-        -double remainingBalance
+        -double changeAmount
         -PaymentMethod paymentMethod
-        -LocalDateTime paymentDate
-        -String spotId
         +generateReceiptText() String
+        +saveToFile(String) boolean
     }
+    
+    class ReceiptPDFGenerator {
+        +generatePDF(Receipt, String)$ File
+    }
+    
+    class ReportExporter {
+        +exportReport(ReportType, ExportFormat, ParkingLot, List~Fine~, String)$ File
+        -exportToTxt(ReportType, ParkingLot, List~Fine~, File)$
+        -exportToPdf(ReportType, ParkingLot, List~Fine~, File)$
+        -exportToCsv(ReportType, ParkingLot, List~Fine~, File)$
+        -exportVehiclePdf(ParkingLot, File)$
+        -exportRevenuePdf(ParkingLot, File)$
+        -exportOccupancyPdf(ParkingLot, File)$
+        -exportFinePdf(List~Fine~, File)$
+    }
+    
+    FineManager ..> FineDAO : uses
+    PaymentProcessor ..> PaymentDAO : uses
+```
 
-    VehicleEntryController --> VehicleDAO
-    VehicleEntryController --> ParkingSpotDAO
-    VehicleEntryController ..> EntryResult : creates
+### View Layer - Main Frames
 
-    VehicleExitController --> VehicleDAO
-    VehicleExitController --> FineDAO
-    VehicleExitController --> FineManager : uses
-    VehicleExitController --> PaymentDAO
-    VehicleExitController --> ParkingSpotDAO
-    VehicleExitController --> ParkingLotDAO
-    VehicleExitController ..> VehicleLookupResult : creates
-    VehicleExitController ..> PaymentSummary : creates
-    VehicleExitController ..> ExitResult : creates
-    VehicleExitController --> FeeCalculator : uses
-    VehicleExitController --> PaymentProcessor : uses
+```mermaid
+classDiagram
+    class ParkingApplication {
+        +main(String[])$ void
+    }
+    
+    class MainFrame {
+        -ParkingLot parkingLot
+        -VehicleEntryPanel entryPanel
+        -VehicleExitPanel exitPanel
+        -AdminPanel adminPanel
+        -ReportingPanel reportingPanel
+        +initializeUI()
+        +switchPanel(String)
+    }
+    
+    class ModernMainFrame {
+        -ParkingLot parkingLot
+        -HeaderPanel headerPanel
+        -SideNavigationPanel sideNavPanel
+        -JPanel contentPanel
+        -StatusBarPanel statusBarPanel
+        -ThemeManager themeManager
+        +initializeUI()
+        +switchPanel(String)
+        +applyTheme()
+    }
+    
+    class VehicleEntryPanel {
+        -VehicleEntryController controller
+        -JTextField licensePlateField
+        -JComboBox vehicleTypeCombo
+        -JCheckBox handicappedCheck
+        +setupUI()
+        +handleEntry()
+    }
+    
+    class VehicleExitPanel {
+        -VehicleExitController controller
+        -JTextField licensePlateField
+        -JTextField amountField
+        -JComboBox paymentMethodCombo
+        +setupUI()
+        +handleExit()
+    }
+    
+    class AdminPanel {
+        -ParkingLot parkingLot
+        -JComboBox strategyCombo
+        +setupUI()
+        +changeStrategy()
+    }
+    
+    class ReportingPanel {
+        -ParkingLot parkingLot
+        -JTable reportTable
+        +setupUI()
+        +generateReport(ReportType)
+        +exportReport(ExportFormat)
+    }
+    
+    ParkingApplication ..> MainFrame : creates
+    ParkingApplication ..> ModernMainFrame : creates
+    MainFrame *-- VehicleEntryPanel
+    MainFrame *-- VehicleExitPanel
+    MainFrame *-- AdminPanel
+    MainFrame *-- ReportingPanel
+```
 
-    FineManager --> FineDAO
-    FineManager --> FineCalculationStrategy : uses
-    PaymentProcessor ..> Receipt : creates
+### View Layer - UI Components
 
-    ExitResult --> PaymentSummary
-    ExitResult --> Payment
-    ExitResult --> Receipt
+```mermaid
+classDiagram
+    class BasePanel {
+        #ParkingLot parkingLot
+        #setupUI()*
+        #refreshData()*
+    }
+    
+    class HeaderPanel {
+        -JLabel titleLabel
+        -JLabel userLabel
+        +updateUser(String)
+    }
+    
+    class SideNavigationPanel {
+        -List~JButton~ buttons
+        -JButton activeButton
+        +setActive(JButton)
+        +addButton(String, ActionListener) JButton
+    }
+    
+    class StatusBarPanel {
+        -JLabel statusLabel
+        +updateStatus(String)
+    }
+    
+    class DashboardCard {
+        -String title
+        -String value
+        -Icon icon
+        +updateValue(String)
+        +setIcon(Icon)
+    }
+    
+    class StyledButton {
+        -boolean isPrimary
+        -boolean isSecondary
+        +applyStyle()
+    }
+    
+    class StyledTextField {
+        -String placeholder
+        +setPlaceholder(String)
+        +getText() String
+    }
+    
+    class StyledComboBox {
+        -List items
+        +addItem(Object)
+        +getSelected() Object
+    }
+    
+    class StyledTable {
+        -TableModel model
+        -String[] columns
+        +setData(Object[][])
+        +refresh()
+    }
+    
+    class StyledDialog {
+        -String title
+        -String message
+        +show()
+        +showError(String)$
+        +showSuccess(String)$
+    }
+    
+    class ThemeManager {
+        -String currentTheme
+        -Map~String,Color~ colors
+        +applyTheme(String)
+        +getColor(String) Color
+        +setTheme(String)
+    }
+    
+    class InputValidator {
+        +validateLicensePlate(String)$ boolean
+        +validateAmount(String)$ boolean
+        +validateSpotId(String)$ boolean
+    }
+    
+    class EventHandler {
+        +onClick()
+        +onChange()
+        +onSubmit()
+    }
+    
+    VehicleEntryPanel --|> BasePanel
+    VehicleExitPanel --|> BasePanel
+    AdminPanel --|> BasePanel
+    ReportingPanel --|> BasePanel
 ```
 
 ---
 
-## 5. Use Case Diagram
+## Sequence Diagrams
+
+### 1. Vehicle Entry Process
 
 ```mermaid
-flowchart TB
-    subgraph Actors
-        Admin((Admin/Operator))
-    end
+sequenceDiagram
+    actor User
+    participant EntryPanel
+    participant EntryController
+    participant VehicleDAO
+    participant SpotDAO
+    participant ParkingLot
+    
+    User->>EntryPanel: Enter Details
+    EntryPanel->>EntryController: processEntry()
+    EntryController->>ParkingLot: findAvailableSpots()
+    ParkingLot-->>EntryController: Available Spots
+    EntryController->>VehicleDAO: save(vehicle)
+    VehicleDAO-->>EntryController: Vehicle ID
+    EntryController->>SpotDAO: update(spot)
+    SpotDAO-->>EntryController: Success
+    EntryController-->>EntryPanel: Entry Success
+    EntryPanel-->>User: Show Success
+```
 
-    subgraph "Parking Lot Management System"
-        UC1[View Dashboard]
-        UC2[View Parking Statistics]
-        UC3[View Reports]
-        UC4[Process Vehicle Entry]
-        UC5[Generate Parking Ticket]
-        UC6[Process Vehicle Exit]
-        UC7[Calculate Parking Fee]
-        UC8[Process Payment]
-        UC9[Check Unpaid Fines]
-        UC10[Generate Receipt]
-        UC11[View Parked Vehicles]
-        UC12[View Unpaid Balances]
-        UC13[Manage Fine Strategies]
-    end
+### 2. Vehicle Exit Process
 
-    Admin --> UC1
-    Admin --> UC2
-    Admin --> UC3
-    Admin --> UC4
-    Admin --> UC6
+```mermaid
+sequenceDiagram
+    actor User
+    participant ExitPanel
+    participant ExitController
+    participant FineManager
+    participant PaymentProcessor
+    participant VehicleDAO
+    participant SpotDAO
+    participant PaymentDAO
+    
+    User->>ExitPanel: Enter License Plate
+    ExitPanel->>ExitController: calculateExitSummary()
+    ExitController->>VehicleDAO: findByLicensePlate()
+    VehicleDAO-->>ExitController: Vehicle Data
+    ExitController->>FineManager: checkAndIssueFine()
+    FineManager-->>ExitController: Fine (if any)
+    ExitController-->>ExitPanel: Exit Summary
+    ExitPanel-->>User: Show Summary
+    
+    User->>ExitPanel: Confirm Payment
+    ExitPanel->>ExitController: processExit()
+    ExitController->>PaymentProcessor: processPayment()
+    PaymentProcessor->>PaymentDAO: save(payment)
+    PaymentDAO-->>PaymentProcessor: Payment ID
+    PaymentProcessor-->>ExitController: Payment
+    ExitController->>VehicleDAO: update(vehicle)
+    ExitController->>SpotDAO: vacateSpot()
+    ExitController->>ExitController: generateReceipt()
+    ExitController-->>ExitPanel: Receipt
+    ExitPanel-->>User: Show Receipt
+```
+
+### 3. Fine Calculation Strategy Change
+
+```mermaid
+sequenceDiagram
+    actor Admin
+    participant AdminPanel
+    participant ParkingLot
+    participant FineCalculationContext
+    participant FineCalculationStrategy
+    
+    Admin->>AdminPanel: Select Strategy
+    AdminPanel->>ParkingLot: changeFineStrategy()
+    ParkingLot->>FineCalculationContext: setStrategy()
+    FineCalculationContext->>FineCalculationStrategy: new Strategy()
+    FineCalculationStrategy-->>FineCalculationContext: Strategy Instance
+    FineCalculationContext-->>ParkingLot: Strategy Set
+    ParkingLot->>ParkingLot: setStrategyChangeTime()
+    ParkingLot-->>AdminPanel: Success
+    AdminPanel-->>Admin: Show Success
+```
+
+### 4. Report Generation and Export
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant ReportingPanel
+    participant ParkingLot
+    participant ReportExporter
+    participant PDFBox
+    
+    User->>ReportingPanel: Select Report Type
+    ReportingPanel->>ParkingLot: getData()
+    ParkingLot-->>ReportingPanel: Report Data
+    ReportingPanel-->>User: Display Report
+    
+    User->>ReportingPanel: Click Export
+    ReportingPanel->>ReportExporter: exportReport(type, format, data)
+    ReportExporter->>PDFBox: createDocument()
+    ReportExporter->>PDFBox: addContent()
+    ReportExporter->>PDFBox: save()
+    PDFBox-->>ReportExporter: File Created
+    ReportExporter-->>ReportingPanel: File Path
+    ReportingPanel-->>User: Show Success
+```
+
+---
+
+## State Diagrams
+
+### Parking Spot State Diagram
+
+```mermaid
+stateDiagram-v2
+    [*] --> AVAILABLE
+    AVAILABLE --> OCCUPIED : occupySpot(vehicle)
+    OCCUPIED --> AVAILABLE : vacateSpot()
+    AVAILABLE --> MAINTENANCE : markForMaintenance()
+    MAINTENANCE --> AVAILABLE : completeMaintenance()
+    AVAILABLE --> RESERVED : reserve()
+    RESERVED --> AVAILABLE : cancelReservation()
+```
+
+### Vehicle Parking Session State Diagram
+
+```mermaid
+stateDiagram-v2
+    [*] --> ENTERED : Vehicle enters
+    ENTERED --> PARKED : Entry time recorded
+    PARKED --> OVERSTAY : time > 24 hours
+    PARKED --> EXITING : processExit()
+    OVERSTAY --> EXITING : processExit()
+    EXITING --> PAYMENT_PROCESSING : Calculate charges
+    PAYMENT_PROCESSING --> EXITED : Payment successful
+    EXITED --> [*]
+```
+
+### Fine State Diagram
+
+```mermaid
+stateDiagram-v2
+    [*] --> ISSUED : Fine issued
+    ISSUED --> PAID : payFine()
+    ISSUED --> UNPAID : time passes
+    UNPAID --> PAID : payFine()
+    PAID --> [*]
+```
+
+---
+
+## Use Case Diagram
+
+```mermaid
+graph TB
+    subgraph System[University Parking Lot Management System]
+        UC1[Enter Parking Lot]
+        UC2[Find Available Parking Spot]
+        UC3[Exit Parking Lot]
+        UC4[Calculate Parking Fee]
+        UC5[Calculate Fine]
+        UC6[Make Payment]
+        UC7[Generate Receipt]
+        UC8[View Parking Status]
+        UC9[View Revenue Report]
+        UC10[View Occupancy Report]
+        UC11[View Vehicle Report]
+        UC12[View Fine Report]
+        UC13[Export Report]
+        UC14[Change Fine Calculation Strategy]
+        UC15[Manage Parking Spots]
+        UC16[View System Dashboard]
+        UC17[Persist Vehicle Data]
+        UC18[Persist Payment Data]
+        UC19[Persist Fine Data]
+        UC20[Calculate Real-time Parking Duration]
+    end
+    
+    Driver((Driver))
+    Admin((Admin))
+    Database((Database))
+    
+    Driver --> UC1
+    UC1 -.->|include| UC2
+    Driver --> UC3
+    UC3 -.->|include| UC4
+    UC4 -.->|extend| UC5
+    UC4 -.->|include| UC6
+    UC6 -.->|include| UC7
+    Driver --> UC8
+    
+    Admin --> UC9
+    Admin --> UC10
     Admin --> UC11
     Admin --> UC12
-    Admin --> UC13
-
-    UC4 --> UC5
-    UC6 --> UC7
-    UC6 --> UC9
-    UC6 --> UC8
-    UC8 --> UC10
+    UC9 -.->|include| UC13
+    UC10 -.->|include| UC13
+    UC11 -.->|include| UC13
+    UC12 -.->|include| UC13
+    Admin --> UC14
+    Admin --> UC15
+    Admin --> UC16
+    
+    Database --> UC17
+    Database --> UC18
+    Database --> UC19
+    Database --> UC20
 ```
 
 ---
 
-## 6. Sequence Diagram - Vehicle Entry
+## Architecture Overview
+
+### Layered Architecture
 
 ```mermaid
-sequenceDiagram
-    participant User as Operator
-    participant EntryPanel as VehicleEntryPanel
-    participant Controller as VehicleEntryController
-    participant VehicleDAO
-    participant SpotDAO as ParkingSpotDAO
-    participant DB as Database
-
-    User->>EntryPanel: Enter license plate, vehicle type, handicapped status
-    User->>EntryPanel: Select spot from available list
-    User->>EntryPanel: Click "Process Entry"
-    
-    EntryPanel->>EntryPanel: Validate input
-    
-    alt Invalid Input
-        EntryPanel->>User: Show error dialog
-    else Valid Input
-        EntryPanel->>Controller: processEntry(licensePlate, vehicleType, isHandicapped, spotId)
-        
-        Controller->>Controller: Check if vehicle already parked
-        
-        alt Vehicle Already Parked
-            Controller-->>EntryPanel: Error: Vehicle already parked
-            EntryPanel->>User: Show error dialog
-        else New Entry
-            Controller->>Controller: Find spot by ID
-            Controller->>Controller: Validate spot availability
-            Controller->>Controller: Check vehicle-spot compatibility
-            
-            alt Spot Not Available or Incompatible
-                Controller-->>EntryPanel: Error message
-                EntryPanel->>User: Show error dialog
-            else Valid Entry
-                Controller->>Controller: Create Vehicle object
-                Controller->>Controller: Set entry time
-                Controller->>Controller: Mark spot as occupied
-                Controller->>Controller: Generate ticket number
-                
-                Controller->>VehicleDAO: save(vehicle)
-                VehicleDAO->>DB: INSERT INTO vehicles
-                DB-->>VehicleDAO: vehicle_id
-                
-                Controller->>SpotDAO: updateStatus(spotId, OCCUPIED)
-                SpotDAO->>DB: UPDATE parking_spots
-                
-                Controller-->>EntryPanel: EntryResult with ticket
-                EntryPanel->>User: Show success dialog with ticket details
-            end
-        end
+graph TB
+    subgraph Presentation[PRESENTATION LAYER]
+        UI[Swing UI Components<br/>MainFrame / ModernMainFrame<br/>Entry/Exit/Admin/Reporting Panels<br/>Styled Components<br/>Theme Manager, Input Validator]
     end
+    
+    subgraph Controller[CONTROLLER LAYER]
+        CTRL[Business Logic Controllers<br/>VehicleEntryController<br/>VehicleExitController]
+    end
+    
+    subgraph Service[SERVICE/UTILITY LAYER]
+        SVC[Business Services<br/>FeeCalculator, FineManager<br/>PaymentProcessor, Receipt<br/>ReceiptPDFGenerator, ReportExporter]
+    end
+    
+    subgraph DAO[DATA ACCESS LAYER]
+        DA[Data Access Objects<br/>DatabaseManager<br/>VehicleDAO, ParkingSpotDAO<br/>FloorDAO, FineDAO<br/>PaymentDAO, ParkingLotDAO]
+    end
+    
+    subgraph Database[DATABASE LAYER]
+        DB[MySQL Database<br/>Tables: parking_lots, floors,<br/>parking_spots, vehicles,<br/>fines, payments, parking_sessions<br/>Views: current_vehicles_with_elapsed_time]
+    end
+    
+    subgraph Domain[DOMAIN MODEL LAYER]
+        DM[Domain Entities<br/>ParkingLot, Floor, ParkingSpot<br/>Vehicle, Fine, Payment<br/>Enumerations<br/>Strategy Pattern]
+    end
+    
+    UI -->|User Actions| CTRL
+    CTRL -->|Business Operations| SVC
+    SVC -->|Data Operations| DA
+    DA -->|SQL Queries| DB
+    DB -->|Persistent Storage| DM
+    CTRL --> DM
+    SVC --> DM
+    DA --> DM
 ```
 
----
-
-## 7. Sequence Diagram - Vehicle Exit & Payment
-
-```mermaid
-sequenceDiagram
-    participant User as Operator
-    participant ExitPanel as VehicleExitPanel
-    participant Controller as VehicleExitController
-    participant FineManager
-    participant FeeCalc as FeeCalculator
-    participant PayProc as PaymentProcessor
-    participant VehicleDAO
-    participant FineDAO
-    participant PaymentDAO
-    participant SpotDAO as ParkingSpotDAO
-    participant LotDAO as ParkingLotDAO
-    participant DB as Database
-
-    User->>ExitPanel: Enter license plate
-    User->>ExitPanel: Click "Lookup Vehicle"
-    
-    ExitPanel->>Controller: getUnpaidFines(licensePlate)
-    Controller->>Controller: lookupVehicle(licensePlate)
-    
-    alt Vehicle in Memory
-        Controller->>Controller: Find in parking lot spots
-    else Vehicle in Database Only
-        Controller->>VehicleDAO: findByLicensePlate(licensePlate)
-        VehicleDAO->>DB: SELECT FROM vehicles_with_duration
-        DB-->>VehicleDAO: Vehicle with elapsed_hours, isOverstay
-        VehicleDAO-->>Controller: Vehicle
-        Controller->>Controller: findSpotById(assignedSpotId)
-        Controller->>Controller: Sync in-memory spot
-    end
-    
-    Controller-->>Controller: VehicleLookupResult
-    
-    alt Vehicle Has Overstayed (elapsed_hours > 24 OR isOverstay = TRUE)
-        Controller->>FineDAO: findUnpaidByLicensePlate(licensePlate)
-        FineDAO->>DB: SELECT unpaid fines
-        DB-->>FineDAO: Existing fines
-        FineDAO-->>Controller: List~Fine~
-        
-        alt No Overstay Fine Exists
-            Controller->>FineManager: checkAndGenerateOverstayFine(vehicle, strategy)
-            FineManager-->>Controller: Fine (RM 50.00)
-            Controller->>FineDAO: save(overstayFine)
-            FineDAO->>DB: INSERT INTO fines
-        end
-    end
-    
-    Controller->>FineDAO: findUnpaidByLicensePlate(licensePlate)
-    FineDAO->>DB: SELECT unpaid fines
-    DB-->>FineDAO: All unpaid fines
-    FineDAO-->>Controller: List~Fine~
-    Controller-->>ExitPanel: List~Fine~
-    
-    ExitPanel->>Controller: generatePaymentSummary(licensePlate, fines)
-    Controller->>Controller: Set exit time
-    Controller->>Controller: Calculate duration (use elapsed_hours from VIEW)
-    Controller->>FeeCalc: calculateParkingFee(vehicle, spot, duration)
-    FeeCalc-->>Controller: Parking fee
-    Controller->>Controller: Calculate total fines
-    Controller->>FeeCalc: calculateTotalAmount(parkingFee, fines)
-    FeeCalc-->>Controller: Total due
-    Controller-->>ExitPanel: PaymentSummary
-    
-    ExitPanel->>User: Display payment summary
-    
-    User->>ExitPanel: Enter payment amount
-    User->>ExitPanel: Select payment method
-    User->>ExitPanel: Click "Process Payment"
-    
-    ExitPanel->>Controller: processExit(licensePlate, amount, method, fines)
-    
-    Controller->>PayProc: validatePayment(amount, totalDue)
-    PayProc-->>Controller: isPaymentSufficient
-    
-    Controller->>PayProc: processPayment(...)
-    PayProc-->>Controller: Payment object
-    
-    Controller->>PayProc: generateReceipt(...)
-    PayProc-->>Controller: Receipt
-    
-    Controller->>Controller: Vacate spot
-    
-    Controller->>VehicleDAO: updateExitTime(licensePlate, exitTime)
-    VehicleDAO->>DB: UPDATE vehicles SET exit_time
-    
-    Controller->>SpotDAO: updateStatus(spotId, AVAILABLE)
-    SpotDAO->>DB: UPDATE parking_spots SET status
-    
-    Controller->>Controller: Update parking lot revenue
-    Controller->>LotDAO: updateRevenue(totalRevenue)
-        LotDAO->>DB: UPDATE parking_lots SET total_revenue
-        
-        Controller->>PaymentDAO: save(payment)
-        PaymentDAO->>DB: INSERT INTO payments
-        
-        Note over Controller,FineDAO: ALWAYS mark original fines as paid
-        Controller->>FineDAO: markAsPaid(all original fines)
-        FineDAO->>DB: UPDATE fines SET is_paid = TRUE
-        
-        alt Payment Insufficient (Partial Payment)
-            Controller->>PayProc: calculateRemainingBalance(amount, totalDue)
-            PayProc-->>Controller: remainingBalance
-            Controller->>FineDAO: save(unpaidBalanceFine)
-            FineDAO->>DB: INSERT INTO fines (UNPAID_BALANCE, amount=remainingBalance)
-            Controller-->>ExitPanel: ExitResult (paymentSufficient=false)
-            ExitPanel->>User: Show partial payment dialog<br/>"Remaining balance: RM XX.XX"
-        else Payment Sufficient (Full Payment)
-            Controller-->>ExitPanel: ExitResult (paymentSufficient=true)
-            ExitPanel->>User: Show success message
-        end
-        
-        ExitPanel->>User: Display receipt
-    end
-```
-
----
-
-## 8. Component Diagram
-
-```mermaid
-flowchart TB
-    subgraph "Presentation Layer"
-        UI[Modern GUI Components<br/>ModernMainFrame, Panels]
-        Styled[Styled Components<br/>StyledButton, StyledTextField, etc.]
-        Theme[Theme Manager]
-    end
-
-    subgraph "Controller Layer"
-        EntryCtrl[Vehicle Entry Controller]
-        ExitCtrl[Vehicle Exit Controller]
-    end
-
-    subgraph "Business Logic Layer"
-        FeeCalc[Fee Calculator]
-        FineManager[Fine Manager]
-        PayProcessor[Payment Processor]
-        Strategies[Fine Calculation Strategies<br/>Fixed, Hourly, Progressive]
-    end
-
-    subgraph "Data Access Layer"
-        VehicleDAO[Vehicle DAO]
-        SpotDAO[Parking Spot DAO]
-        FineDAO[Fine DAO]
-        PaymentDAO[Payment DAO]
-        FloorDAO[Floor DAO]
-        LotDAO[Parking Lot DAO]
-        DBManager[Database Manager<br/>Connection Pool]
-    end
-
-    subgraph "Model Layer"
-        Models[Domain Models<br/>ParkingLot, Vehicle, Fine, etc.]
-    end
-
-    subgraph "Database"
-        MySQL[(MySQL Database<br/>parking_lot)]
-    end
-
-    UI --> EntryCtrl
-    UI --> ExitCtrl
-    UI --> Theme
-    Styled --> Theme
-
-    EntryCtrl --> VehicleDAO
-    EntryCtrl --> SpotDAO
-    EntryCtrl --> Models
-    
-    ExitCtrl --> VehicleDAO
-    ExitCtrl --> FineDAO
-    ExitCtrl --> PaymentDAO
-    ExitCtrl --> SpotDAO
-    ExitCtrl --> LotDAO
-    ExitCtrl --> FeeCalc
-    ExitCtrl --> PayProcessor
-    ExitCtrl --> Models
-
-    FineManager --> Strategies
-    FineManager --> FineDAO
-    FineManager --> Models
-    
-    PayProcessor --> PaymentDAO
-    PayProcessor --> Models
-
-    VehicleDAO --> DBManager
-    SpotDAO --> DBManager
-    FineDAO --> DBManager
-    PaymentDAO --> DBManager
-    FloorDAO --> DBManager
-    LotDAO --> DBManager
-
-    DBManager --> MySQL
-    
-    VehicleDAO --> Models
-    SpotDAO --> Models
-    FineDAO --> Models
-    PaymentDAO --> Models
-    FloorDAO --> Models
-    LotDAO --> Models
-```
-
----
-
-## 9. Package Diagram
-
-```mermaid
-flowchart TB
-    subgraph "com.university.parking"
-        Main[ParkingApplication<br/>Main Entry Point]
-        
-        subgraph model["model"]
-            M1[ParkingLot, Floor, ParkingSpot]
-            M2[Vehicle, Fine, Payment]
-            M3[ParkingSession]
-            M4[Enums: VehicleType, SpotType,<br/>SpotStatus, FineType, PaymentMethod]
-            M5[Strategy Pattern:<br/>FineCalculationStrategy,<br/>FixedFineStrategy,<br/>HourlyFineStrategy,<br/>ProgressiveFineStrategy,<br/>FineCalculationContext]
-        end
-        
-        subgraph view["view"]
-            V1[ModernMainFrame]
-            V2[Panels: AdminPanel, VehicleEntryPanel,<br/>VehicleExitPanel, ReportingPanel]
-            V3[Layout: HeaderPanel, SideNavigationPanel,<br/>StatusBarPanel]
-            V4[Styled Components: StyledButton,<br/>StyledTextField, StyledTable,<br/>StyledComboBox, StyledDialog,<br/>DashboardCard]
-            V5[ThemeManager]
-            V6[BasePanel]
-        end
-        
-        subgraph controller["controller"]
-            C1[VehicleEntryController]
-            C2[VehicleExitController]
-            C3[Inner Classes: EntryResult,<br/>VehicleLookupResult,<br/>PaymentSummary, ExitResult]
-        end
-        
-        subgraph dao["dao"]
-            D1[DatabaseManager]
-            D2[ParkingLotDAO, FloorDAO,<br/>ParkingSpotDAO]
-            D3[VehicleDAO, FineDAO,<br/>PaymentDAO]
-        end
-        
-        subgraph util["util"]
-            U1[FeeCalculator]
-            U2[FineManager]
-            U3[PaymentProcessor]
-            U4[Receipt]
-        end
-    end
-
-    Main --> view
-    view --> controller
-    view --> model
-    controller --> dao
-    controller --> util
-    controller --> model
-    util --> dao
-    util --> model
-    dao --> model
-```
-
----
-
-## 10. Entity Relationship Diagram (Database)
+### Database Schema
 
 ```mermaid
 erDiagram
-    PARKING_LOT ||--o{ FLOOR : contains
-    FLOOR ||--o{ PARKING_SPOT : contains
-    PARKING_SPOT ||--o| VEHICLE : "currently parks"
-    VEHICLE ||--o{ FINE : "has fines"
-    VEHICLE ||--o{ PAYMENT : "has payments"
-    VEHICLE ||--|| VEHICLES_WITH_DURATION : "real-time view"
-
-    PARKING_LOT {
+    PARKING_LOTS ||--o{ FLOORS : contains
+    FLOORS ||--o{ PARKING_SPOTS : contains
+    PARKING_SPOTS ||--o| VEHICLES : parks
+    VEHICLES ||--o{ FINES : may_have
+    VEHICLES ||--o{ PAYMENTS : makes
+    VEHICLES ||--o{ PARKING_SESSIONS : creates
+    
+    PARKING_LOTS {
         bigint id PK
         varchar name
-        int total_floors
         decimal total_revenue
-        varchar current_fine_strategy
+        varchar fine_strategy
+        datetime strategy_change_time
     }
-
-    FLOOR {
+    
+    FLOORS {
         bigint id PK
         bigint parking_lot_id FK
         int floor_number
         int total_spots
     }
-
-    PARKING_SPOT {
+    
+    PARKING_SPOTS {
         bigint id PK
+        varchar spot_id UK
         bigint floor_id FK
-        varchar spot_id UK "Format: F1-R2-S3"
-        varchar spot_type "COMPACT, REGULAR, HANDICAPPED, RESERVED"
+        varchar spot_type
+        varchar status
         decimal hourly_rate
-        varchar status "AVAILABLE, OCCUPIED"
-        bigint current_vehicle_id FK
-    }
-
-    VEHICLE {
-        bigint id PK
-        varchar license_plate
-        varchar vehicle_type "MOTORCYCLE, CAR, SUV_TRUCK, HANDICAPPED"
-        boolean is_handicapped
-        datetime entry_time
-        datetime exit_time
-        varchar assigned_spot_id
+        varchar current_vehicle_license_plate FK
     }
     
-    VEHICLES_WITH_DURATION {
-        bigint id "VIEW - Real-time calculation"
-        varchar license_plate
+    VEHICLES {
+        varchar license_plate PK
         varchar vehicle_type
-        boolean is_handicapped
         datetime entry_time
         datetime exit_time
-        varchar assigned_spot_id
-        bigint elapsed_seconds "Computed"
-        bigint elapsed_minutes "Computed"
-        bigint elapsed_hours "Computed"
-        boolean is_overstay "Computed (>24 hours)"
+        boolean is_handicapped
+        varchar assigned_spot_id FK
     }
-
-    FINE {
+    
+    FINES {
         bigint id PK
-        varchar license_plate
-        varchar fine_type "OVERSTAY, UNAUTHORIZED_RESERVED, UNPAID_BALANCE"
+        varchar license_plate FK
+        varchar fine_type
         decimal amount
         datetime issued_date
         boolean is_paid
     }
-
-    PAYMENT {
+    
+    PAYMENTS {
         bigint id PK
-        varchar license_plate
+        varchar license_plate FK
         decimal parking_fee
         decimal fine_amount
         decimal total_amount
-        varchar payment_method "CASH, CARD"
+        varchar payment_method
         datetime payment_date
+        bigint parking_session_id FK
+    }
+    
+    PARKING_SESSIONS {
+        bigint id PK
+        varchar license_plate
+        varchar spot_id
+        datetime entry_time
+        datetime exit_time
+        decimal parking_fee
+        decimal fine_amount
+        decimal total_amount
     }
 ```
 
 ---
 
-## Notes
+## Design Patterns
 
-### Key Design Patterns
+### Strategy Pattern Implementation
 
-1. **Strategy Pattern**: Used for fine calculation with three strategies (Fixed, Hourly, Progressive)
-2. **DAO Pattern**: Separates data access logic from business logic
-3. **MVC Architecture**: Clear separation between Model, View, and Controller layers
-4. **Singleton-like**: ThemeManager uses static constants for centralized theme management
-5. **Factory-like**: BasePanel provides factory methods for creating styled components
-
-### Important Relationships
-
-- **ParkingLot** contains multiple **Floors**, each containing multiple **ParkingSpots**
-- **ParkingSpot** can have at most one **Vehicle** parked (0..1 relationship)
-- **Vehicle** is identified by license plate and can have multiple **Fines** and **Payments**
-- **Fines** persist across parking sessions (linked to license plate, not parking session)
-- **DatabaseManager** uses connection pooling for efficient database access
-- All styled components use **ThemeManager** for consistent appearance
-
-### Database Design
-
-- Uses MySQL with InnoDB engine for transaction support
-- Spot IDs follow format: `F{floor}-R{row}-S{spot}` (e.g., "F1-R2-S3")
-- Fines are linked to license plates (not vehicle IDs) to persist across sessions
-- Connection pooling implemented with `BlockingQueue<Connection>`
-- Database name: `parking_lot` (configurable for testing)
-
-### GUI Architecture
-
-- **ModernMainFrame** uses BorderLayout with CardLayout for content switching
-- **SideNavigationPanel** contains **NavButton** instances for navigation
-- **BasePanel** provides common functionality for all content panels
-- All styled components extend Swing components with custom painting
-- Theme colors and fonts centralized in **ThemeManager**
-
-### View these diagrams
-
-- GitHub: Automatically renders Mermaid diagrams
-- VS Code: Install "Markdown Preview Mermaid Support" extension
-- Other tools: Any Markdown viewer with Mermaid support
-
+```mermaid
+graph TB
+    subgraph Strategy Pattern
+        Context[FineCalculationContext]
+        Interface[FineCalculationStrategy Interface]
+        Fixed[FixedFineStrategy<br/>50 RM flat]
+        Hourly[HourlyFineStrategy<br/>10 RM per hour]
+        Progressive[ProgressiveFineStrategy<br/>20 RM base + 5 RM per hour]
+        
+        Context -->|uses| Interface
+        Interface <|..|implements| Fixed
+        Interface <|..|implements| Hourly
+        Interface <|..|implements| Progressive
+    end
+    
+    ParkingLot -->|contains| Context
+    Admin -->|changes strategy| ParkingLot
+```
 
 ---
 
-## Recent Updates (January 2026)
+## Summary
 
-### New Features Reflected in Diagrams
+This UML documentation provides a comprehensive view of the University Parking Lot Management System using Mermaid diagrams:
 
-1. **Real-Time Elapsed Time Tracking**
-   - Added `vehicles_with_duration` VIEW in ER diagram
-   - Vehicle model includes: elapsed_seconds, elapsed_minutes, elapsed_hours, isOverstay
-   - Timezone-aware calculation (UTC+8)
+- **Class Diagrams**: Detailed class structures across all layers (Model, DAO, Controller, Utility, View)
+- **Package Diagram**: Organization of classes into logical packages
+- **Sequence Diagrams**: Key workflows (Vehicle Entry, Exit, Fine Strategy Change, Report Export)
+- **State Diagrams**: State transitions for Parking Spots, Vehicles, and Fines
+- **Use Case Diagram**: Actor interactions and system functionality
+- **Architecture Overview**: Layered architecture and design patterns
+- **Database Schema**: Entity relationship diagram
 
-2. **Automatic Overstay Fine Generation**
-   - VehicleExitController now uses FineManager
-   - Overstay fine (RM 50) generated automatically during lookup
-   - Sequence diagram updated to show fine generation flow
+The system follows a clean layered architecture with clear separation of concerns:
+- **Presentation Layer**: Swing UI components
+- **Controller Layer**: Business logic
+- **Service Layer**: Utility services
+- **DAO Layer**: Data access
+- **Database Layer**: MySQL persistence
+- **Domain Model**: Core business entities
 
-3. **Partial Payment Handling**
-   - Original fines always marked as paid
-   - UNPAID_BALANCE fine created for remaining amount
-   - Sequence diagram shows both full and partial payment flows
-
-4. **Database Vehicle Lookup**
-   - ParkingLot.findSpotById() method added
-   - Can find vehicles inserted via SQL (not just in-memory)
-   - Syncs in-memory state with database
-
-5. **Auto-Clear Entry Form**
-   - Form fields cleared after successful entry
-   - Improves user experience for multiple entries
-
-### Key Implementation Details
-
-- **Overstay Detection**: Uses `isOverstay` flag from VIEW or `elapsed_hours > 24`
-- **Fine Strategy**: FixedFineStrategy (RM 50.00 flat fine)
-- **Fine Persistence**: Linked to license plate, persists across sessions
-- **Payment Logic**: Always marks original fines as paid, creates unpaid balance for remainder
-- **Database VIEW**: Calculates elapsed time in real-time, no caching
-
+Key design patterns implemented:
+- Strategy Pattern for fine calculations
+- DAO Pattern for data access
+- MVC Pattern for application structure
+- Singleton for database management

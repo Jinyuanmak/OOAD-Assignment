@@ -239,8 +239,9 @@ public class VehicleExitController {
             }
         }
 
-        // Update parking lot revenue
-        parkingLot.setTotalRevenue(parkingLot.getTotalRevenue() + amountPaid);
+        // Update parking lot revenue - only add the actual charges, not overpayment
+        double actualRevenue = Math.min(amountPaid, summary.getTotalDue());
+        parkingLot.setTotalRevenue(parkingLot.getTotalRevenue() + actualRevenue);
         
         // Update revenue in database
         if (parkingLotDAO != null) {
