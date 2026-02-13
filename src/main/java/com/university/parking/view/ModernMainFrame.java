@@ -42,6 +42,7 @@ public class ModernMainFrame extends JFrame {
     private VehicleEntryPanel entryPanel;
     private VehicleExitPanel exitPanel;
     private ReportingPanel reportingPanel;
+    private ReservationPanel reservationPanel;
     
     // Data
     private final ParkingLot parkingLot;
@@ -53,6 +54,7 @@ public class ModernMainFrame extends JFrame {
     public static final String CARD_ENTRY = SideNavigationPanel.NAV_ENTRY;
     public static final String CARD_EXIT = SideNavigationPanel.NAV_EXIT;
     public static final String CARD_REPORTS = SideNavigationPanel.NAV_REPORTS;
+    public static final String CARD_RESERVATIONS = "Reservations";
     
     /**
      * Creates a new ModernMainFrame with the specified parking lot.
@@ -115,12 +117,14 @@ public class ModernMainFrame extends JFrame {
         entryPanel = new VehicleEntryPanel(parkingLot, dbManager, fineDAO);
         exitPanel = new VehicleExitPanel(parkingLot, dbManager, fineDAO);
         reportingPanel = new ReportingPanel(parkingLot, dbManager, fineDAO);
+        reservationPanel = new ReservationPanel(parkingLot, dbManager);
         
         // Add panels to card layout
         contentPanel.add(adminPanel, CARD_DASHBOARD);
         contentPanel.add(entryPanel, CARD_ENTRY);
         contentPanel.add(exitPanel, CARD_EXIT);
         contentPanel.add(reportingPanel, CARD_REPORTS);
+        contentPanel.add(reservationPanel, CARD_RESERVATIONS);
         
         // Create status bar panel
         statusBarPanel = new StatusBarPanel(parkingLot);
@@ -225,6 +229,11 @@ public class ModernMainFrame extends JFrame {
             case CARD_REPORTS:
                 if (reportingPanel != null) {
                     reportingPanel.refreshData();
+                }
+                break;
+            case CARD_RESERVATIONS:
+                if (reservationPanel != null) {
+                    reservationPanel.refreshData();
                 }
                 break;
             default:

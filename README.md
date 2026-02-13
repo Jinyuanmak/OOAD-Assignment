@@ -18,11 +18,30 @@ A comprehensive parking facility management system built with Java Swing and MyS
 
 ### Fine Management
 - Automatic fine issuance for overstay (>24 hours)
+- Automatic fine for unauthorized reserved spot parking (RM 100)
 - Multiple fine calculation strategies:
   - Fixed: RM 50 flat fine
   - Hourly: RM 10 per hour
   - Progressive: RM 50 base + RM 10 per hour
 - Fine payment tracking
+- Unpaid balance tracking across sessions
+
+### Reservation System
+- Reserve specific RESERVED parking spots in advance
+- Set reservation time windows (start and end times)
+- Validation during vehicle entry
+- Automatic RM 100 fine for unauthorized reserved spot usage
+- View and manage all reservations
+- Cancel reservations when needed
+
+**How to Use**:
+1. Navigate to "Reservations" panel
+2. Enter license plate and reserved spot ID
+3. Set duration in hours (default: 24 hours)
+4. Click "Create Reservation"
+5. Vehicle must enter within the reservation time window
+6. If correct vehicle enters → No fine, normal parking rate (RM 10/hr for RESERVED spots)
+7. If wrong vehicle enters → RM 100 fine issued automatically
 
 ### Payment Processing
 - Multiple payment methods: Cash, Credit Card, Debit Card, E-Wallet, Online Banking
@@ -130,10 +149,20 @@ src/main/java/com/university/parking/
 8. Receipt is generated automatically
 
 ### Admin Functions
-1. Navigate to "Admin" panel
+1. Navigate to "Admin" panel (Dashboard)
 2. Change fine calculation strategy
 3. View system statistics
 4. Manage parking configuration
+
+### Reservations
+1. Navigate to "Reservations" panel
+2. Enter license plate number
+3. Select reserved spot ID from dropdown (shows only available RESERVED spots)
+4. Set duration in hours (default: 24 hours)
+5. Click "Create Reservation"
+6. View all reservations in the table
+7. Select and cancel reservations if needed
+8. Click "Refresh" to update available spots after vehicles enter/exit
 
 ### Reports
 1. Navigate to "Reporting" panel
@@ -178,7 +207,7 @@ Change strategy via Admin panel. Strategy changes only affect new entries after 
 **Fine Types**:
 - **OVERSTAY**: Automatically issued when vehicle parks > 24 hours
 - **UNPAID_BALANCE**: Created when customer makes partial payment (pays less than total due)
-- **UNAUTHORIZED_RESERVED**: Reserved spot violation (if implemented)
+- **UNAUTHORIZED_RESERVED**: Issued when vehicle parks in reserved spot without valid reservation (RM 100 fine)
 
 **Unpaid Balance Handling**:
 - If customer pays less than total due, the remaining balance becomes an UNPAID_BALANCE fine
@@ -208,9 +237,25 @@ Change strategy via Admin panel. Strategy changes only affect new entries after 
 - `fines`: Fine records
 - `payments`: Payment transactions
 - `parking_sessions`: Historical parking records
+- `reservations`: Parking spot reservations
 
 ### Views
-- `current_vehicles_with_elapsed_time`: Real-time duration calculation
+- `vehicles_with_duration`: Real-time duration calculation
+
+## Reservation System
+
+### How It Works
+1. Vehicles can reserve RESERVED spots in advance
+2. Reservations have start and end times
+3. During vehicle entry, system validates if vehicle has valid reservation for the spot
+4. If parking in RESERVED spot without valid reservation → RM 100 fine issued automatically
+5. Fine must be paid upon exit along with parking fees
+
+### Reservation Validation
+- Checks license plate matches reservation
+- Checks spot ID matches reservation
+- Checks current time is within reservation window (start_time to end_time)
+- Checks reservation is active (not cancelled)
 
 ## Design Patterns
 

@@ -10,13 +10,16 @@ import com.university.parking.dao.FineDAO;
 import com.university.parking.dao.ParkingLotDAO;
 import com.university.parking.dao.ParkingSpotDAO;
 import com.university.parking.dao.PaymentDAO;
+import com.university.parking.dao.ReservationDAO;
 import com.university.parking.dao.VehicleDAO;
 import com.university.parking.model.Fine;
 import com.university.parking.model.ParkingLot;
 import com.university.parking.model.ParkingSpot;
 import com.university.parking.model.Payment;
 import com.university.parking.model.PaymentMethod;
+import com.university.parking.model.Reservation;
 import com.university.parking.model.SpotStatus;
+import com.university.parking.model.SpotType;
 import com.university.parking.model.Vehicle;
 import com.university.parking.util.FeeCalculator;
 import com.university.parking.util.FineManager;
@@ -38,6 +41,7 @@ public class VehicleExitController {
     private final ParkingSpotDAO spotDAO;
     private final VehicleDAO vehicleDAO;
     private final ParkingLotDAO parkingLotDAO;
+    private final ReservationDAO reservationDAO;
     private final List<Fine> unpaidFines;
 
     public VehicleExitController(ParkingLot parkingLot) {
@@ -53,6 +57,7 @@ public class VehicleExitController {
         this.spotDAO = dbManager != null ? new ParkingSpotDAO(dbManager) : null;
         this.vehicleDAO = dbManager != null ? new VehicleDAO(dbManager) : null;
         this.parkingLotDAO = dbManager != null ? new ParkingLotDAO(dbManager) : null;
+        this.reservationDAO = dbManager != null ? new ReservationDAO(dbManager) : null;
         this.unpaidFines = new ArrayList<>();
     }
 
@@ -138,20 +143,61 @@ public class VehicleExitController {
 
         // Calculate duration - use elapsed_hours from VIEW if available, otherwise calculate manually
         long durationHours;
+        long durationMinutes = 0;
+        boolean isWithinGracePeriod = false;
+        
         if (vehicle.getElapsedHours() != null && vehicle.getElapsedHours() > 0) {
             // Use elapsed_hours from database VIEW (timezone-aware)
             durationHours = vehicle.getElapsedHours();
+            if (vehicle.getElapsedMinutes() != null) {
+                durationMinutes = vehicle.getElapsedMinutes();
+            }
         } else {
             // Fallback to manual calculation (ceiling rounded)
             durationHours = vehicle.calculateParkingDuration();
+            // Calculate exact minutes for grace period check
+            java.time.Duration duration = java.time.Duration.between(vehicle.getEntryTime(), exitTime);
+            durationMinutes = duration.toMinutes();
+        }
+
+        // Check for valid prepaid reservation first
+        boolean hasPrepaidReservation = false;
+        Reservation validReservation = null;
+        if (reservationDAO != null) {
+            try {
+                validReservation = reservationDAO.findValidReservation(
+                    licensePlate.trim().toUpperCase(), 
+                    spot.getSpotId(), 
+                    exitTime
+                );
+                if (validReservation != null) {
+                    hasPrepaidReservation = true;
+                }
+            } catch (SQLException e) {
+                System.err.println("Warning: Failed to check for reservation: " + e.getMessage());
+            }
         }
         
-        if (durationHours == 0) {
-            durationHours = 1; // Minimum 1 hour charge
+        // Check for 15-minute grace period (U-turn)
+        // Applies to:
+        // 1. All non-RESERVED spots
+        // 2. RESERVED spots WITHOUT valid reservation (wrong plate number)
+        boolean isReservedSpotWithoutReservation = (spot.getType() == SpotType.RESERVED && !hasPrepaidReservation);
+        boolean canApplyGracePeriod = (spot.getType() != SpotType.RESERVED) || isReservedSpotWithoutReservation;
+        
+        if (canApplyGracePeriod && durationMinutes <= 15) {
+            isWithinGracePeriod = true;
+            durationHours = 0; // No charge for grace period
+        } else if (durationHours == 0) {
+            durationHours = 1; // Minimum 1 hour charge after grace period
         }
 
         // Calculate parking fee
-        double parkingFee = FeeCalculator.calculateParkingFee(vehicle, spot, durationHours);
+        // Skip if: prepaid reservation exists OR within grace period
+        double parkingFee = 0.0;
+        if (!hasPrepaidReservation && !isWithinGracePeriod) {
+            parkingFee = FeeCalculator.calculateParkingFee(vehicle, spot, durationHours);
+        }
 
         // Calculate total fines
         double totalFines = 0.0;
@@ -171,7 +217,10 @@ public class VehicleExitController {
             parkingFee,
             unpaidFinesList != null ? unpaidFinesList : new ArrayList<>(),
             totalFines,
-            totalDue
+            totalDue,
+            hasPrepaidReservation,
+            validReservation,
+            isWithinGracePeriod
         );
     }
 
@@ -215,7 +264,9 @@ public class VehicleExitController {
             summary.getTotalFines(),
             amountPaid,
             paymentMethod,
-            summary.getSpot().getSpotId()
+            summary.getSpot().getSpotId(),
+            summary.hasPrepaidReservation(),
+            summary.isWithinGracePeriod()
         );
 
         // Mark spot as available (Requirement 4.7)
@@ -414,10 +465,29 @@ public class VehicleExitController {
         private final List<Fine> unpaidFines;
         private final double totalFines;
         private final double totalDue;
+        private final boolean hasPrepaidReservation;
+        private final Reservation reservation;
+        private final boolean isWithinGracePeriod;
 
         public PaymentSummary(Vehicle vehicle, ParkingSpot spot, long durationHours,
                              double parkingFee, List<Fine> unpaidFines, 
                              double totalFines, double totalDue) {
+            this(vehicle, spot, durationHours, parkingFee, unpaidFines, totalFines, totalDue, false, null, false);
+        }
+
+        public PaymentSummary(Vehicle vehicle, ParkingSpot spot, long durationHours,
+                             double parkingFee, List<Fine> unpaidFines, 
+                             double totalFines, double totalDue,
+                             boolean hasPrepaidReservation, Reservation reservation) {
+            this(vehicle, spot, durationHours, parkingFee, unpaidFines, totalFines, totalDue, 
+                 hasPrepaidReservation, reservation, false);
+        }
+
+        public PaymentSummary(Vehicle vehicle, ParkingSpot spot, long durationHours,
+                             double parkingFee, List<Fine> unpaidFines, 
+                             double totalFines, double totalDue,
+                             boolean hasPrepaidReservation, Reservation reservation,
+                             boolean isWithinGracePeriod) {
             this.vehicle = vehicle;
             this.spot = spot;
             this.durationHours = durationHours;
@@ -425,6 +495,9 @@ public class VehicleExitController {
             this.unpaidFines = unpaidFines;
             this.totalFines = totalFines;
             this.totalDue = totalDue;
+            this.hasPrepaidReservation = hasPrepaidReservation;
+            this.reservation = reservation;
+            this.isWithinGracePeriod = isWithinGracePeriod;
         }
 
         public Vehicle getVehicle() {
@@ -455,6 +528,18 @@ public class VehicleExitController {
             return totalDue;
         }
 
+        public boolean hasPrepaidReservation() {
+            return hasPrepaidReservation;
+        }
+
+        public Reservation getReservation() {
+            return reservation;
+        }
+
+        public boolean isWithinGracePeriod() {
+            return isWithinGracePeriod;
+        }
+
         /**
          * Generates a formatted payment summary display.
          */
@@ -467,7 +552,15 @@ public class VehicleExitController {
             sb.append("Exit Time: ").append(vehicle.getExitTime()).append("\n");
             sb.append("-----------------------\n");
             sb.append("Hours Parked: ").append(durationHours).append("\n");
-            sb.append("Parking Fee: RM ").append(String.format("%.2f", parkingFee)).append("\n");
+            
+            if (hasPrepaidReservation) {
+                sb.append("Parking Fee: RM 0.00 (PREPAID RESERVATION)\n");
+            } else if (isWithinGracePeriod) {
+                sb.append("Parking Fee: RM 0.00 (15-MIN GRACE PERIOD)\n");
+            } else {
+                sb.append("Parking Fee: RM ").append(String.format("%.2f", parkingFee)).append("\n");
+            }
+            
             sb.append("Unpaid Fines: RM ").append(String.format("%.2f", totalFines)).append("\n");
             sb.append("-----------------------\n");
             sb.append("TOTAL DUE: RM ").append(String.format("%.2f", totalDue)).append("\n");

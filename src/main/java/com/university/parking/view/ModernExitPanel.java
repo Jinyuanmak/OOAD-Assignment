@@ -11,6 +11,7 @@ import java.util.List;
 
 import javax.swing.BorderFactory;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSeparator;
@@ -308,8 +309,20 @@ public class ModernExitPanel extends BasePanel {
             // Display summary
             summaryArea.setText(currentSummary.getDisplayText());
             
-            // Pre-fill payment amount
-            paymentAmountField.setText(String.format("%.2f", currentSummary.getTotalDue()));
+            // Check if this is grace period or prepaid reservation
+            boolean isZeroPaymentExit = currentSummary.isWithinGracePeriod() || currentSummary.hasPrepaidReservation();
+            
+            if (isZeroPaymentExit) {
+                // Lock payment amount field for grace period or prepaid reservation
+                paymentAmountField.setText("0.00");
+                paymentAmountField.setEditable(false);
+                paymentAmountField.setEnabled(false);
+            } else {
+                // Unlock payment amount field for normal exits
+                paymentAmountField.setEditable(true);
+                paymentAmountField.setEnabled(true);
+                paymentAmountField.setText(String.format("%.2f", currentSummary.getTotalDue()));
+            }
             
             // Enable payment button
             processPaymentButton.setEnabled(true);
@@ -331,17 +344,54 @@ public class ModernExitPanel extends BasePanel {
             return;
         }
 
+        PaymentMethod paymentMethod = (PaymentMethod) paymentMethodCombo.getSelectedItem();
+        String licensePlate = licensePlateField.getText().trim().toUpperCase();
+        
+        // Special handling for grace period exits
+        if (currentSummary.isWithinGracePeriod()) {
+            if (paymentMethod == PaymentMethod.CARD) {
+                // CARD payment: No amount needed, can exit with RM 0.00
+                processGracePeriodExit(licensePlate, 0.0, paymentMethod);
+                return;
+            } else {
+                // CASH payment: Must insert cash, then refund
+                processGracePeriodCashPayment(licensePlate);
+                return;
+            }
+        }
+        
+        // Special handling for prepaid reservations with CASH payment
+        if (currentSummary.hasPrepaidReservation() && paymentMethod == PaymentMethod.CASH) {
+            // CASH payment for prepaid reservation: Must insert cash, then refund
+            processPrepaidReservationCashPayment(licensePlate);
+            return;
+        }
+        
+        // Normal payment processing (non-grace period, non-prepaid-cash)
         String amountText = paymentAmountField.getText().trim();
         if (!validateNotEmpty(paymentAmountField, "Payment amount")) {
             return;
         }
-        if (!validatePositiveNumber(amountText, "Payment amount")) {
+        
+        // Special case: Allow 0.00 for prepaid reservations with CARD
+        boolean isZeroPaymentAllowed = currentSummary.hasPrepaidReservation();
+        
+        if (!isZeroPaymentAllowed && !validatePositiveNumber(amountText, "Payment amount")) {
             return;
         }
-
-        double amountPaid = Double.parseDouble(amountText);
-        PaymentMethod paymentMethod = (PaymentMethod) paymentMethodCombo.getSelectedItem();
-        String licensePlate = licensePlateField.getText().trim().toUpperCase();
+        
+        // Validate it's a valid number (even if 0.00)
+        double amountPaid;
+        try {
+            amountPaid = Double.parseDouble(amountText);
+            if (amountPaid < 0) {
+                StyledDialog.showError(this, "Payment amount cannot be negative");
+                return;
+            }
+        } catch (NumberFormatException e) {
+            StyledDialog.showError(this, "Payment amount must be a valid number");
+            return;
+        }
 
         try {
             List<Fine> unpaidFines = exitController.getUnpaidFines(licensePlate);
@@ -371,11 +421,160 @@ public class ModernExitPanel extends BasePanel {
             StyledDialog.showError(this, "Error processing payment: " + e.getMessage());
         }
     }
+    
+    /**
+     * Handles grace period exit with CARD payment (no cash needed).
+     */
+    private void processGracePeriodExit(String licensePlate, double amountPaid, PaymentMethod paymentMethod) {
+        try {
+            List<Fine> unpaidFines = exitController.getUnpaidFines(licensePlate);
+            VehicleExitController.ExitResult result = exitController.processExit(
+                licensePlate, amountPaid, paymentMethod, unpaidFines
+            );
+
+            // Display receipt
+            receiptArea.setText(result.getReceipt().generateReceiptText());
+
+            StyledDialog.showSuccess(this, "Grace Period Exit - No Charge!\n\nVehicle may now exit.");
+
+            // Clear form for next transaction
+            clearForm();
+
+        } catch (Exception e) {
+            StyledDialog.showError(this, "Error processing exit: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Handles grace period exit with CASH payment (requires cash insertion, then refund).
+     */
+    private void processGracePeriodCashPayment(String licensePlate) {
+        // Show cash denomination selection dialog
+        String[] cashOptions = {"RM 1", "RM 5", "RM 10", "RM 50", "RM 100"};
+        String selectedCash = (String) JOptionPane.showInputDialog(
+            this,
+            "Grace Period Exit - CASH Payment\n\n" +
+            "Please insert cash (will be fully refunded):",
+            "Insert Cash",
+            JOptionPane.QUESTION_MESSAGE,
+            null,
+            cashOptions,
+            cashOptions[2] // Default to RM 10
+        );
+        
+        if (selectedCash == null) {
+            return; // User cancelled
+        }
+        
+        // Extract amount from selection
+        double cashInserted = 0.0;
+        switch (selectedCash) {
+            case "RM 1": cashInserted = 1.0; break;
+            case "RM 5": cashInserted = 5.0; break;
+            case "RM 10": cashInserted = 10.0; break;
+            case "RM 50": cashInserted = 50.0; break;
+            case "RM 100": cashInserted = 100.0; break;
+        }
+        
+        try {
+            List<Fine> unpaidFines = exitController.getUnpaidFines(licensePlate);
+            VehicleExitController.ExitResult result = exitController.processExit(
+                licensePlate, 0.0, PaymentMethod.CASH, unpaidFines
+            );
+
+            // Get receipt text with refund notice
+            String receiptText = result.getReceipt().generateReceiptText();
+            receiptText += "\n========================================\n";
+            receiptText += "       GRACE PERIOD - FULL REFUND\n";
+            receiptText += "========================================\n";
+            receiptText += String.format("Cash Inserted : RM %.2f\n", cashInserted);
+            receiptText += String.format("Refund Amount : RM %.2f\n", cashInserted);
+            receiptText += "========================================\n";
+            
+            // Display receipt
+            receiptArea.setText(receiptText);
+
+            StyledDialog.showSuccess(this, "Grace Period Exit - Full Refund!\n\n" +
+                "Cash Inserted: RM " + String.format("%.2f", cashInserted) + "\n" +
+                "Refund Amount: RM " + String.format("%.2f", cashInserted) + "\n\n" +
+                "Vehicle may now exit.");
+
+            // Clear form for next transaction
+            clearForm();
+
+        } catch (Exception e) {
+            StyledDialog.showError(this, "Error processing exit: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Handles prepaid reservation exit with CASH payment (requires cash insertion, then refund).
+     */
+    private void processPrepaidReservationCashPayment(String licensePlate) {
+        // Show cash denomination selection dialog
+        String[] cashOptions = {"RM 1", "RM 5", "RM 10", "RM 50", "RM 100"};
+        String selectedCash = (String) JOptionPane.showInputDialog(
+            this,
+            "Prepaid Reservation Exit - CASH Payment\n\n" +
+            "Please insert cash (will be fully refunded):",
+            "Insert Cash",
+            JOptionPane.QUESTION_MESSAGE,
+            null,
+            cashOptions,
+            cashOptions[2] // Default to RM 10
+        );
+        
+        if (selectedCash == null) {
+            return; // User cancelled
+        }
+        
+        // Extract amount from selection
+        double cashInserted = 0.0;
+        switch (selectedCash) {
+            case "RM 1": cashInserted = 1.0; break;
+            case "RM 5": cashInserted = 5.0; break;
+            case "RM 10": cashInserted = 10.0; break;
+            case "RM 50": cashInserted = 50.0; break;
+            case "RM 100": cashInserted = 100.0; break;
+        }
+        
+        try {
+            List<Fine> unpaidFines = exitController.getUnpaidFines(licensePlate);
+            VehicleExitController.ExitResult result = exitController.processExit(
+                licensePlate, 0.0, PaymentMethod.CASH, unpaidFines
+            );
+
+            // Get receipt text with refund notice
+            String receiptText = result.getReceipt().generateReceiptText();
+            receiptText += "\n========================================\n";
+            receiptText += "    PREPAID RESERVATION - FULL REFUND\n";
+            receiptText += "========================================\n";
+            receiptText += String.format("Cash Inserted : RM %.2f\n", cashInserted);
+            receiptText += String.format("Refund Amount : RM %.2f\n", cashInserted);
+            receiptText += "========================================\n";
+            
+            // Display receipt
+            receiptArea.setText(receiptText);
+
+            StyledDialog.showSuccess(this, "Prepaid Reservation Exit - Full Refund!\n\n" +
+                "Cash Inserted: RM " + String.format("%.2f", cashInserted) + "\n" +
+                "Refund Amount: RM " + String.format("%.2f", cashInserted) + "\n\n" +
+                "Vehicle may now exit.");
+
+            // Clear form for next transaction
+            clearForm();
+
+        } catch (Exception e) {
+            StyledDialog.showError(this, "Error processing exit: " + e.getMessage());
+        }
+    }
 
     private void clearForm() {
         licensePlateField.setText("");
         summaryArea.setText("");
         paymentAmountField.setText("");
+        paymentAmountField.setEditable(true);
+        paymentAmountField.setEnabled(true);
         receiptArea.setText("");
         currentSummary = null;
         processPaymentButton.setEnabled(false);

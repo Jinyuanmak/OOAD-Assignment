@@ -37,6 +37,7 @@ public class SideNavigationPanel extends JPanel {
     public static final String NAV_ENTRY = "Vehicle Entry";
     public static final String NAV_EXIT = "Vehicle Exit";
     public static final String NAV_REPORTS = "Reports";
+    public static final String NAV_RESERVATIONS = "Reservations";
     
     /**
      * Creates a new SideNavigationPanel with the specified navigation listener.
@@ -55,6 +56,7 @@ public class SideNavigationPanel extends JPanel {
         addNavButton(NAV_DASHBOARD, "");
         addNavButton(NAV_ENTRY, "");
         addNavButton(NAV_EXIT, "");
+        addNavButton(NAV_RESERVATIONS, "");
         addNavButton(NAV_REPORTS, "");
         
         // Set first button as active by default

@@ -152,6 +152,22 @@ public class DatabaseManager {
                 ") ENGINE=InnoDB"
             );
 
+            stmt.execute(
+                "CREATE TABLE IF NOT EXISTS reservations (" +
+                "id BIGINT AUTO_INCREMENT PRIMARY KEY, " +
+                "license_plate VARCHAR(20) NOT NULL, " +
+                "spot_id VARCHAR(50) NOT NULL, " +
+                "start_time DATETIME NOT NULL, " +
+                "end_time DATETIME NOT NULL, " +
+                "is_active BOOLEAN NOT NULL DEFAULT TRUE, " +
+                "created_at DATETIME NOT NULL, " +
+                "prepaid_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00, " +
+                "INDEX idx_license_plate (license_plate), " +
+                "INDEX idx_spot_id (spot_id), " +
+                "INDEX idx_time_range (start_time, end_time)" +
+                ") ENGINE=InnoDB"
+            );
+
             // Create VIEW for real-time elapsed time tracking
             stmt.execute(
                 "CREATE OR REPLACE VIEW vehicles_with_duration AS " +

@@ -115,7 +115,13 @@ public class ReceiptPDFGenerator {
                 contentStream.setFont(PDType1Font.HELVETICA, fontSize);
                 contentStream.beginText();
                 contentStream.newLineAtOffset(margin, yPosition);
-                contentStream.showText(String.format("Parking Fee: RM %.2f", receipt.getParkingFee()));
+                if (receipt.isPrepaidReservation()) {
+                    contentStream.showText(String.format("Parking Fee: RM %.2f (PREPAID)", receipt.getParkingFee()));
+                } else if (receipt.isWithinGracePeriod()) {
+                    contentStream.showText(String.format("Parking Fee: RM %.2f (15-MIN GRACE)", receipt.getParkingFee()));
+                } else {
+                    contentStream.showText(String.format("Parking Fee: RM %.2f", receipt.getParkingFee()));
+                }
                 contentStream.endText();
                 yPosition -= leading;
                 

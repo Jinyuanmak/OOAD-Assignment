@@ -24,6 +24,8 @@ public class Receipt {
     private PaymentMethod paymentMethod;
     private LocalDateTime paymentDate;
     private String spotId;
+    private boolean isPrepaidReservation;
+    private boolean isWithinGracePeriod;
 
     private static final DateTimeFormatter DATE_FORMATTER = 
         DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
@@ -31,6 +33,22 @@ public class Receipt {
     public Receipt(String licensePlate, LocalDateTime entryTime, LocalDateTime exitTime,
                    long durationHours, double parkingFee, double fineAmount,
                    double amountPaid, PaymentMethod paymentMethod, String spotId) {
+        this(licensePlate, entryTime, exitTime, durationHours, parkingFee, fineAmount, 
+             amountPaid, paymentMethod, spotId, false, false);
+    }
+
+    public Receipt(String licensePlate, LocalDateTime entryTime, LocalDateTime exitTime,
+                   long durationHours, double parkingFee, double fineAmount,
+                   double amountPaid, PaymentMethod paymentMethod, String spotId, 
+                   boolean isPrepaidReservation) {
+        this(licensePlate, entryTime, exitTime, durationHours, parkingFee, fineAmount, 
+             amountPaid, paymentMethod, spotId, isPrepaidReservation, false);
+    }
+
+    public Receipt(String licensePlate, LocalDateTime entryTime, LocalDateTime exitTime,
+                   long durationHours, double parkingFee, double fineAmount,
+                   double amountPaid, PaymentMethod paymentMethod, String spotId, 
+                   boolean isPrepaidReservation, boolean isWithinGracePeriod) {
         this.licensePlate = licensePlate;
         this.entryTime = entryTime;
         this.exitTime = exitTime;
@@ -44,6 +62,8 @@ public class Receipt {
         this.paymentMethod = paymentMethod;
         this.paymentDate = LocalDateTime.now();
         this.spotId = spotId;
+        this.isPrepaidReservation = isPrepaidReservation;
+        this.isWithinGracePeriod = isWithinGracePeriod;
     }
 
     /**
@@ -73,7 +93,13 @@ public class Receipt {
         
         // Charges Breakdown
         receipt.append("----------------------------------------\n");
-        receipt.append(String.format("Parking Fee   : RM %.2f\n", parkingFee));
+        if (isPrepaidReservation) {
+            receipt.append(String.format("Parking Fee   : RM %.2f (PREPAID)\n", parkingFee));
+        } else if (isWithinGracePeriod) {
+            receipt.append(String.format("Parking Fee   : RM %.2f (15-MIN GRACE)\n", parkingFee));
+        } else {
+            receipt.append(String.format("Parking Fee   : RM %.2f\n", parkingFee));
+        }
         if (fineAmount > 0) {
             receipt.append(String.format("Fines         : RM %.2f\n", fineAmount));
         }
@@ -159,6 +185,14 @@ public class Receipt {
 
     public String getSpotId() {
         return spotId;
+    }
+
+    public boolean isPrepaidReservation() {
+        return isPrepaidReservation;
+    }
+
+    public boolean isWithinGracePeriod() {
+        return isWithinGracePeriod;
     }
 
     @Override

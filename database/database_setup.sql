@@ -136,6 +136,27 @@ CREATE TABLE IF NOT EXISTS payments (
     payment_date DATETIME NOT NULL
 ) ENGINE=InnoDB;
 
+-- Table 7: reservations
+-- ============================================
+-- Reservation System:
+-- Allows vehicles to reserve RESERVED spots in advance
+-- Validates reservations during vehicle entry
+-- Issues UNAUTHORIZED_RESERVED fine (RM 100) if parking without valid reservation
+-- ============================================
+CREATE TABLE IF NOT EXISTS reservations (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    license_plate VARCHAR(20) NOT NULL COMMENT 'Vehicle license plate',
+    spot_id VARCHAR(50) NOT NULL COMMENT 'Reserved spot ID (must be RESERVED type)',
+    start_time DATETIME NOT NULL COMMENT 'Reservation start time',
+    end_time DATETIME NOT NULL COMMENT 'Reservation end time',
+    is_active BOOLEAN NOT NULL DEFAULT TRUE COMMENT '1=ACTIVE, 0=CANCELLED',
+    created_at DATETIME NOT NULL COMMENT 'Reservation creation time',
+    prepaid_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT 'Amount paid upfront for reservation (RM 10/hr × duration)',
+    INDEX idx_license_plate (license_plate),
+    INDEX idx_spot_id (spot_id),
+    INDEX idx_time_range (start_time, end_time)
+) ENGINE=InnoDB;
+
 -- ============================================
 -- Verification Queries
 -- ============================================

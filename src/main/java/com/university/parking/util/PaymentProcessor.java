@@ -95,8 +95,60 @@ public class PaymentProcessor {
                                          double parkingFee, double fineAmount,
                                          double amountPaid, PaymentMethod paymentMethod,
                                          String spotId) {
+        return generateReceipt(licensePlate, entryTime, exitTime, durationHours,
+                              parkingFee, fineAmount, amountPaid, paymentMethod, spotId, false, false);
+    }
+
+    /**
+     * Generates a receipt for a completed payment transaction with prepaid reservation flag.
+     * 
+     * @param licensePlate the vehicle's license plate
+     * @param entryTime the parking entry time
+     * @param exitTime the parking exit time
+     * @param durationHours the parking duration in hours
+     * @param parkingFee the parking fee
+     * @param fineAmount the total fine amount
+     * @param amountPaid the amount paid
+     * @param paymentMethod the payment method used
+     * @param spotId the parking spot ID
+     * @param isPrepaidReservation whether this is a prepaid reservation
+     * @return a Receipt object containing all transaction details
+     */
+    public static Receipt generateReceipt(String licensePlate, LocalDateTime entryTime,
+                                         LocalDateTime exitTime, long durationHours,
+                                         double parkingFee, double fineAmount,
+                                         double amountPaid, PaymentMethod paymentMethod,
+                                         String spotId, boolean isPrepaidReservation) {
+        return generateReceipt(licensePlate, entryTime, exitTime, durationHours,
+                              parkingFee, fineAmount, amountPaid, paymentMethod, spotId, 
+                              isPrepaidReservation, false);
+    }
+
+    /**
+     * Generates a receipt for a completed payment transaction with all flags.
+     * 
+     * @param licensePlate the vehicle's license plate
+     * @param entryTime the parking entry time
+     * @param exitTime the parking exit time
+     * @param durationHours the parking duration in hours
+     * @param parkingFee the parking fee
+     * @param fineAmount the total fine amount
+     * @param amountPaid the amount paid
+     * @param paymentMethod the payment method used
+     * @param spotId the parking spot ID
+     * @param isPrepaidReservation whether this is a prepaid reservation
+     * @param isWithinGracePeriod whether this is within 15-minute grace period
+     * @return a Receipt object containing all transaction details
+     */
+    public static Receipt generateReceipt(String licensePlate, LocalDateTime entryTime,
+                                         LocalDateTime exitTime, long durationHours,
+                                         double parkingFee, double fineAmount,
+                                         double amountPaid, PaymentMethod paymentMethod,
+                                         String spotId, boolean isPrepaidReservation,
+                                         boolean isWithinGracePeriod) {
         return new Receipt(licensePlate, entryTime, exitTime, durationHours,
-                          parkingFee, fineAmount, amountPaid, paymentMethod, spotId);
+                          parkingFee, fineAmount, amountPaid, paymentMethod, spotId, 
+                          isPrepaidReservation, isWithinGracePeriod);
     }
 
     /**

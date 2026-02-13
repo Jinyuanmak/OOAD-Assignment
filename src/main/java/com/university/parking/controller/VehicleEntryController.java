@@ -7,8 +7,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.university.parking.dao.DatabaseManager;
+import com.university.parking.dao.FineDAO;
 import com.university.parking.dao.ParkingSpotDAO;
+import com.university.parking.dao.ReservationDAO;
 import com.university.parking.dao.VehicleDAO;
+import com.university.parking.model.Fine;
+import com.university.parking.model.FineType;
 import com.university.parking.model.ParkingLot;
 import com.university.parking.model.ParkingSession;
 import com.university.parking.model.ParkingSpot;
@@ -27,7 +31,10 @@ public class VehicleEntryController {
     private final DatabaseManager dbManager;
     private final VehicleDAO vehicleDAO;
     private final ParkingSpotDAO spotDAO;
+    private final ReservationDAO reservationDAO;
+    private final FineDAO fineDAO;
     private static final DateTimeFormatter TIMESTAMP_FORMAT = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
+    private static final double UNAUTHORIZED_RESERVED_FINE = 100.0; // RM 100 fine for unauthorized parking in reserved spot
 
     public VehicleEntryController(ParkingLot parkingLot) {
         this(parkingLot, null);
@@ -38,6 +45,8 @@ public class VehicleEntryController {
         this.dbManager = dbManager;
         this.vehicleDAO = dbManager != null ? new VehicleDAO(dbManager) : null;
         this.spotDAO = dbManager != null ? new ParkingSpotDAO(dbManager) : null;
+        this.reservationDAO = dbManager != null ? new ReservationDAO(dbManager) : null;
+        this.fineDAO = dbManager != null ? new FineDAO(dbManager) : null;
     }
 
     /**
@@ -114,6 +123,28 @@ public class VehicleEntryController {
             throw new IllegalArgumentException("Vehicle type " + vehicleType + 
                 " cannot park in spot type " + spot.getType());
         }
+        
+        // Check if parking in reserved spot - validate reservation
+        Fine unauthorizedFine = null;
+        if (spot.getType() == com.university.parking.model.SpotType.RESERVED) {
+            boolean hasValidReservation = checkReservation(normalizedPlate, spotId);
+            if (!hasValidReservation) {
+                // Issue UNAUTHORIZED_RESERVED fine
+                unauthorizedFine = new Fine(normalizedPlate, FineType.UNAUTHORIZED_RESERVED, UNAUTHORIZED_RESERVED_FINE);
+                unauthorizedFine.setIssuedDate(LocalDateTime.now());
+                
+                // Save fine to database
+                if (fineDAO != null) {
+                    try {
+                        fineDAO.save(unauthorizedFine);
+                        System.out.println("UNAUTHORIZED_RESERVED fine issued: RM " + UNAUTHORIZED_RESERVED_FINE + 
+                                         " for vehicle " + normalizedPlate + " parking in spot " + spotId);
+                    } catch (SQLException e) {
+                        System.err.println("Warning: Failed to save unauthorized fine: " + e.getMessage());
+                    }
+                }
+            }
+        }
 
         // Record entry time
         LocalDateTime entryTime = LocalDateTime.now();
@@ -146,7 +177,29 @@ public class VehicleEntryController {
             }
         }
 
-        return new EntryResult(vehicle, spot, session, ticketNumber);
+        return new EntryResult(vehicle, spot, session, ticketNumber, unauthorizedFine);
+    }
+
+    /**
+     * Checks if a vehicle has a valid reservation for the specified spot.
+     * @param licensePlate the vehicle's license plate
+     * @param spotId the spot ID
+     * @return true if vehicle has valid reservation, false otherwise
+     */
+    private boolean checkReservation(String licensePlate, String spotId) {
+        if (reservationDAO == null) {
+            return false; // No database, no reservations
+        }
+        
+        try {
+            LocalDateTime now = LocalDateTime.now();
+            com.university.parking.model.Reservation reservation = 
+                reservationDAO.findValidReservation(licensePlate, spotId, now);
+            return reservation != null;
+        } catch (SQLException e) {
+            System.err.println("Error checking reservation: " + e.getMessage());
+            return false;
+        }
     }
 
     /**
@@ -203,13 +256,20 @@ public class VehicleEntryController {
         private final ParkingSpot spot;
         private final ParkingSession session;
         private final String ticketNumber;
+        private final Fine unauthorizedFine;
 
         public EntryResult(Vehicle vehicle, ParkingSpot spot, 
                           ParkingSession session, String ticketNumber) {
+            this(vehicle, spot, session, ticketNumber, null);
+        }
+
+        public EntryResult(Vehicle vehicle, ParkingSpot spot, 
+                          ParkingSession session, String ticketNumber, Fine unauthorizedFine) {
             this.vehicle = vehicle;
             this.spot = spot;
             this.session = session;
             this.ticketNumber = ticketNumber;
+            this.unauthorizedFine = unauthorizedFine;
         }
 
         public Vehicle getVehicle() {
@@ -228,6 +288,14 @@ public class VehicleEntryController {
             return ticketNumber;
         }
 
+        public Fine getUnauthorizedFine() {
+            return unauthorizedFine;
+        }
+
+        public boolean hasUnauthorizedFine() {
+            return unauthorizedFine != null;
+        }
+
         /**
          * Gets a formatted display string for the ticket.
          * Requirement 3.5: Display ticket containing spot location and entry time
@@ -242,6 +310,14 @@ public class VehicleEntryController {
             sb.append("Spot Type: ").append(spot.getType()).append("\n");
             sb.append("Hourly Rate: RM ").append(String.format("%.2f", spot.getHourlyRate())).append("\n");
             sb.append("Entry Time: ").append(vehicle.getEntryTime()).append("\n");
+            
+            if (hasUnauthorizedFine()) {
+                sb.append("\n*** WARNING ***\n");
+                sb.append("UNAUTHORIZED RESERVED SPOT PARKING\n");
+                sb.append("Fine Issued: RM ").append(String.format("%.2f", unauthorizedFine.getAmount())).append("\n");
+                sb.append("This fine must be paid upon exit.\n");
+            }
+            
             sb.append("======================");
             return sb.toString();
         }
