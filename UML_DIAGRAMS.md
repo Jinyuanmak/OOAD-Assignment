@@ -91,6 +91,19 @@ classDiagram
         -Long parkingSessionId
     }
     
+    class Reservation {
+        -Long id
+        -String licensePlate
+        -String spotId
+        -LocalDateTime startTime
+        -LocalDateTime endTime
+        -boolean isActive
+        -LocalDateTime createdAt
+        -double prepaidAmount
+        +isValidAt(LocalDateTime) boolean
+        +isCurrentlyValid() boolean
+    }
+    
     class ParkingSession {
         -Long id
         -String licensePlate
@@ -105,6 +118,7 @@ classDiagram
     ParkingLot "1" *-- "1..*" Floor : contains
     Floor "1" *-- "*" ParkingSpot : contains
     ParkingSpot "1" o-- "0..1" Vehicle : parks
+    ParkingSpot "1" o-- "*" Reservation : reserved_by
 ```
 
 ### Enumerations
@@ -141,6 +155,8 @@ classDiagram
         OVERSTAY
         UNAUTHORIZED_PARKING
         EXPIRED_PERMIT
+        RESERVED_SPOT_VIOLATION
+        UNPAID_BALANCE
     }
     
     class PaymentMethod {
@@ -265,12 +281,24 @@ classDiagram
         +update(ParkingLot) boolean
     }
     
+    class ReservationDAO {
+        -DatabaseManager dbManager
+        +save(Reservation) boolean
+        +findValidReservation(String, String, LocalDateTime) Reservation
+        +findByLicensePlate(String) List~Reservation~
+        +findBySpotId(String) List~Reservation~
+        +isSpotReserved(String, LocalDateTime, LocalDateTime) boolean
+        +cancel(Long) boolean
+        +findAll() List~Reservation~
+    }
+    
     VehicleDAO ..> DatabaseManager : uses
     ParkingSpotDAO ..> DatabaseManager : uses
     FloorDAO ..> DatabaseManager : uses
     FineDAO ..> DatabaseManager : uses
     PaymentDAO ..> DatabaseManager : uses
     ParkingLotDAO ..> DatabaseManager : uses
+    ReservationDAO ..> DatabaseManager : uses
 ```
 
 ### Controller Layer
@@ -292,11 +320,14 @@ classDiagram
         -ParkingSpotDAO spotDAO
         -FineDAO fineDAO
         -PaymentDAO paymentDAO
+        -ReservationDAO reservationDAO
         -FineManager fineManager
         -PaymentProcessor paymentProcessor
         +processExit(String, double, PaymentMethod) ExitSummary
         +calculateExitSummary(String) ExitSummary
         +validateExit(String) String
+        +generatePaymentSummary(String, List~Fine~) PaymentSummary
+        +getUnpaidFines(String) List~Fine~
     }
     
     VehicleEntryController ..> VehicleDAO : uses
@@ -305,6 +336,7 @@ classDiagram
     VehicleExitController ..> ParkingSpotDAO : uses
     VehicleExitController ..> FineDAO : uses
     VehicleExitController ..> PaymentDAO : uses
+    VehicleExitController ..> ReservationDAO : uses
 ```
 
 ### Utility Layer
@@ -342,6 +374,8 @@ classDiagram
         -double amountPaid
         -double changeAmount
         -PaymentMethod paymentMethod
+        -boolean hasPrepaidReservation
+        -boolean isWithinGracePeriod
         +generateReceiptText() String
         +saveToFile(String) boolean
     }
@@ -428,12 +462,28 @@ classDiagram
         +exportReport(ExportFormat)
     }
     
+    class ReservationPanel {
+        -ParkingLot parkingLot
+        -ReservationDAO reservationDAO
+        -PaymentDAO paymentDAO
+        -ParkingLotDAO parkingLotDAO
+        -JTextField licensePlateField
+        -JComboBox spotIdComboBox
+        -JTextField hoursField
+        -JTable reservationTable
+        +createReservation()
+        +cancelReservation()
+        +loadReservations()
+        +refreshAvailableSpots()
+    }
+    
     ParkingApplication ..> MainFrame : creates
     ParkingApplication ..> ModernMainFrame : creates
     MainFrame *-- VehicleEntryPanel
     MainFrame *-- VehicleExitPanel
     MainFrame *-- AdminPanel
     MainFrame *-- ReportingPanel
+    MainFrame *-- ReservationPanel
 ```
 
 ### View Layer - UI Components
@@ -565,6 +615,7 @@ sequenceDiagram
     actor User
     participant ExitPanel
     participant ExitController
+    participant ReservationDAO
     participant FineManager
     participant PaymentProcessor
     participant VehicleDAO
@@ -575,17 +626,44 @@ sequenceDiagram
     ExitPanel->>ExitController: calculateExitSummary()
     ExitController->>VehicleDAO: findByLicensePlate()
     VehicleDAO-->>ExitController: Vehicle Data
+    ExitController->>ReservationDAO: findValidReservation()
+    ReservationDAO-->>ExitController: Reservation (if exists)
+    ExitController->>ExitController: Check Grace Period (15 min)
     ExitController->>FineManager: checkAndIssueFine()
     FineManager-->>ExitController: Fine (if any)
     ExitController-->>ExitPanel: Exit Summary
     ExitPanel-->>User: Show Summary
     
-    User->>ExitPanel: Confirm Payment
-    ExitPanel->>ExitController: processExit()
-    ExitController->>PaymentProcessor: processPayment()
-    PaymentProcessor->>PaymentDAO: save(payment)
-    PaymentDAO-->>PaymentProcessor: Payment ID
-    PaymentProcessor-->>ExitController: Payment
+    alt Prepaid Reservation or Grace Period
+        ExitPanel->>ExitPanel: Lock Payment Amount Field
+        alt CASH Payment
+            User->>ExitPanel: Select CASH
+            ExitPanel->>User: Show Cash Denomination Dialog
+            User->>ExitPanel: Insert Cash (RM 1/5/10/50/100)
+            ExitPanel->>ExitController: processExit(0.00, CASH)
+            ExitController->>PaymentProcessor: processPayment()
+            PaymentProcessor-->>ExitController: Payment
+            ExitController-->>ExitPanel: Receipt with Refund Notice
+            ExitPanel->>User: Show Receipt Dialog
+            ExitPanel->>User: Ask to Save PDF
+        else CARD Payment
+            User->>ExitPanel: Select CARD
+            ExitPanel->>ExitController: processExit(0.00, CARD)
+            ExitController->>PaymentProcessor: processPayment()
+            PaymentProcessor-->>ExitController: Payment
+            ExitController-->>ExitPanel: Receipt
+            ExitPanel->>User: Show Receipt Dialog
+            ExitPanel->>User: Ask to Save PDF
+        end
+    else Normal Exit
+        User->>ExitPanel: Confirm Payment
+        ExitPanel->>ExitController: processExit()
+        ExitController->>PaymentProcessor: processPayment()
+        PaymentProcessor->>PaymentDAO: save(payment)
+        PaymentDAO-->>PaymentProcessor: Payment ID
+        PaymentProcessor-->>ExitController: Payment
+    end
+    
     ExitController->>VehicleDAO: update(vehicle)
     ExitController->>SpotDAO: vacateSpot()
     ExitController->>ExitController: generateReceipt()
@@ -593,7 +671,44 @@ sequenceDiagram
     ExitPanel-->>User: Show Receipt
 ```
 
-### 3. Fine Calculation Strategy Change
+### 3. Reservation Creation Process
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant ReservationPanel
+    participant ReservationDAO
+    participant PaymentDAO
+    participant ParkingLotDAO
+    participant ParkingLot
+    
+    User->>ReservationPanel: Enter Reservation Details
+    ReservationPanel->>ReservationPanel: Validate Inputs
+    ReservationPanel->>ReservationPanel: Calculate Prepaid Amount
+    ReservationPanel->>User: Show Payment Dialog (CASH/CARD)
+    User->>ReservationPanel: Select Payment Method
+    
+    ReservationPanel->>ReservationDAO: isSpotReserved(spotId, startTime, endTime)
+    ReservationDAO-->>ReservationPanel: Availability Status
+    
+    alt Spot Available
+        ReservationPanel->>ReservationDAO: save(reservation)
+        ReservationDAO-->>ReservationPanel: Reservation ID
+        ReservationPanel->>PaymentDAO: save(payment)
+        PaymentDAO-->>ReservationPanel: Payment ID
+        ReservationPanel->>ParkingLot: addRevenue(prepaidAmount)
+        ParkingLot-->>ReservationPanel: Revenue Updated
+        ReservationPanel->>ParkingLotDAO: updateRevenue()
+        ParkingLotDAO-->>ReservationPanel: Success
+        ReservationPanel-->>User: Show Success Message
+        ReservationPanel->>ReservationPanel: refreshAvailableSpots()
+        ReservationPanel->>ReservationPanel: loadReservations()
+    else Spot Already Reserved
+        ReservationPanel-->>User: Show Error Message
+    end
+```
+
+### 4. Fine Calculation Strategy Change
 
 ```mermaid
 sequenceDiagram
@@ -614,7 +729,7 @@ sequenceDiagram
     AdminPanel-->>Admin: Show Success
 ```
 
-### 4. Report Generation and Export
+### 5. Report Generation and Export
 
 ```mermaid
 sequenceDiagram
@@ -637,6 +752,61 @@ sequenceDiagram
     PDFBox-->>ReportExporter: File Created
     ReportExporter-->>ReportingPanel: File Path
     ReportingPanel-->>User: Show Success
+```
+
+### 6. Reserved Spot Violation Fine
+
+```mermaid
+sequenceDiagram
+    actor Driver
+    participant EntryController
+    participant VehicleDAO
+    participant ReservationDAO
+    participant FineDAO
+    participant ParkingSpot
+    
+    Driver->>EntryController: Enter Reserved Spot
+    EntryController->>ParkingSpot: Check Spot Type
+    ParkingSpot-->>EntryController: RESERVED
+    EntryController->>ReservationDAO: findValidReservation(licensePlate, spotId)
+    ReservationDAO-->>EntryController: null (No Valid Reservation)
+    EntryController->>FineDAO: Issue RESERVED_SPOT_VIOLATION Fine (RM 100)
+    FineDAO-->>EntryController: Fine Created
+    EntryController->>VehicleDAO: save(vehicle)
+    VehicleDAO-->>EntryController: Vehicle Saved
+    EntryController-->>Driver: Entry Allowed with Fine Notice
+```
+
+### 7. Grace Period Exit (15-Minute U-Turn)
+
+```mermaid
+sequenceDiagram
+    actor Driver
+    participant ExitPanel
+    participant ExitController
+    participant VehicleDAO
+    
+    Driver->>ExitPanel: Enter License Plate (within 15 min)
+    ExitPanel->>ExitController: generatePaymentSummary()
+    ExitController->>VehicleDAO: findByLicensePlate()
+    VehicleDAO-->>ExitController: Vehicle Data
+    ExitController->>ExitController: Calculate Duration (< 15 min)
+    ExitController-->>ExitPanel: Summary (RM 0.00 - Grace Period)
+    ExitPanel->>ExitPanel: Lock Payment Amount Field
+    
+    alt CASH Payment
+        Driver->>ExitPanel: Select CASH
+        ExitPanel->>Driver: Show Cash Denomination Dialog
+        Driver->>ExitPanel: Insert Cash (e.g., RM 10)
+        ExitPanel->>ExitController: processExit(0.00, CASH)
+        ExitController-->>ExitPanel: Receipt with Refund Notice
+        ExitPanel->>Driver: Show Receipt + Refund RM 10
+    else CARD Payment
+        Driver->>ExitPanel: Select CARD
+        ExitPanel->>ExitController: processExit(0.00, CARD)
+        ExitController-->>ExitPanel: Receipt
+        ExitPanel->>Driver: Show Receipt
+    end
 ```
 
 ---
@@ -708,6 +878,13 @@ graph TB
         UC18[Persist Payment Data]
         UC19[Persist Fine Data]
         UC20[Calculate Real-time Parking Duration]
+        UC21[Create Reservation]
+        UC22[Cancel Reservation]
+        UC23[View Reservations]
+        UC24[Process Prepaid Payment]
+        UC25[Apply Grace Period]
+        UC26[Process Cash Refund]
+        UC27[Issue Reserved Spot Violation Fine]
     end
     
     Driver((Driver))
@@ -716,12 +893,19 @@ graph TB
     
     Driver --> UC1
     UC1 -.->|include| UC2
+    UC1 -.->|extend| UC27
     Driver --> UC3
     UC3 -.->|include| UC4
     UC4 -.->|extend| UC5
+    UC4 -.->|extend| UC25
     UC4 -.->|include| UC6
+    UC6 -.->|extend| UC26
     UC6 -.->|include| UC7
     Driver --> UC8
+    Driver --> UC21
+    UC21 -.->|include| UC24
+    Driver --> UC22
+    Driver --> UC23
     
     Admin --> UC9
     Admin --> UC10
@@ -734,6 +918,7 @@ graph TB
     Admin --> UC14
     Admin --> UC15
     Admin --> UC16
+    Admin --> UC23
     
     Database --> UC17
     Database --> UC18
@@ -790,6 +975,7 @@ erDiagram
     PARKING_LOTS ||--o{ FLOORS : contains
     FLOORS ||--o{ PARKING_SPOTS : contains
     PARKING_SPOTS ||--o| VEHICLES : parks
+    PARKING_SPOTS ||--o{ RESERVATIONS : reserved_by
     VEHICLES ||--o{ FINES : may_have
     VEHICLES ||--o{ PAYMENTS : makes
     VEHICLES ||--o{ PARKING_SESSIONS : creates
@@ -858,6 +1044,17 @@ erDiagram
         decimal fine_amount
         decimal total_amount
     }
+    
+    RESERVATIONS {
+        bigint id PK
+        varchar license_plate
+        varchar spot_id FK
+        datetime start_time
+        datetime end_time
+        boolean is_active
+        datetime created_at
+        decimal prepaid_amount
+    }
 ```
 
 ---
@@ -912,3 +1109,67 @@ Key design patterns implemented:
 - DAO Pattern for data access
 - MVC Pattern for application structure
 - Singleton for database management
+
+
+---
+
+## New Features Summary
+
+### 1. Reservation System
+- **Prepaid Reservations**: Customers pay upfront for reserved spots (RM 10/hour)
+- **Multiple Entry/Exit**: Within reservation period, vehicles can enter/exit multiple times without additional charges
+- **Reservation Management**: Create, view, and cancel reservations
+- **No Refund Policy**: Cancelled reservations do not receive refunds
+- **Database Persistence**: Reservations stored in `reservations` table
+
+### 2. Grace Period (15-Minute U-Turn)
+- **Zero Charge Exit**: Vehicles exiting within 15 minutes pay RM 0.00 parking fee
+- **Applies To**:
+  - All non-RESERVED spots
+  - RESERVED spots WITHOUT valid reservation (wrong plate number)
+- **After Grace Period**: Minimum 1-hour parking fee applies
+- **Payment Handling**:
+  - CASH: Must insert cash (RM 1/5/10/50/100), then full refund
+  - CARD: No amount needed, can exit with RM 0.00
+
+### 3. Reserved Spot Violation Fine
+- **New Fine Type**: `RESERVED_SPOT_VIOLATION`
+- **Amount**: RM 100 fixed fine
+- **Triggered When**: Non-reserved vehicle enters a RESERVED spot
+- **Grace Period Interaction**:
+  - Exit within 15 min: RM 100 fine only (no parking fee)
+  - Exit after 15 min: RM 100 fine + RM 10 parking fee = RM 110
+
+### 4. Prepaid Reservation Exit
+- **Zero Payment**: Vehicles with valid reservations pay RM 0.00 at exit
+- **Payment Method Handling**:
+  - CASH: Shows denomination dialog, inserts cash, receives full refund
+  - CARD: No amount needed, exits immediately
+- **Receipt Generation**: Shows "PREPAID RESERVATION" status on receipt
+- **UI Enhancement**: Payment amount field is locked (disabled) for prepaid exits
+
+### 5. Cash Refund System
+- **Denomination Selection**: RM 1, 5, 10, 50, 100
+- **Refund Scenarios**:
+  - Grace period exits with CASH payment
+  - Prepaid reservation exits with CASH payment
+- **Receipt Display**: Shows cash inserted and refund amount
+- **PDF Generation**: Option to save receipt with refund details
+
+### 6. UI Enhancements
+- **Payment Amount Field Locking**: Automatically locks for grace period and prepaid reservation exits
+- **Receipt Dialog**: Shows receipt in dialog before asking to save PDF
+- **Cash Denomination Dialog**: User-friendly selection for cash payments
+- **Status Indicators**: Clear display of "PREPAID", "15-MIN GRACE", or normal payment status
+
+### 7. Fine Types
+- **OVERSTAY**: Vehicle parked > 24 hours (strategy-based calculation)
+- **UNAUTHORIZED_PARKING**: General unauthorized parking
+- **EXPIRED_PERMIT**: Parking with expired permit
+- **RESERVED_SPOT_VIOLATION**: Non-reserved vehicle in RESERVED spot (RM 100)
+- **UNPAID_BALANCE**: Remaining balance from partial payment
+
+### 8. Reservation Behavior
+- **If Vehicle Never Enters**: Reservation remains valid, prepaid amount already collected, spot remains available for other vehicles
+- **Expiration**: After end time, reservation status shows "EXPIRED" but remains in database for record-keeping
+- **No Entry Required**: System does not require vehicle to physically enter to maintain reservation validity
