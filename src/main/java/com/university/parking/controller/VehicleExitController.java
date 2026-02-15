@@ -292,7 +292,10 @@ public class VehicleExitController {
             summary.getSpot().getSpotId(),
             summary.hasPrepaidReservation(),
             summary.isWithinGracePeriod(),
-            summary.getVehicle().isHandicapped()
+            summary.getVehicle().isHandicapped(),
+            summary.getVehicle().getType(),
+            summary.getSpot().getType(),
+            summary.getSpot().getHourlyRate()
         );
 
         // Mark spot as available (Requirement 4.7)
@@ -570,13 +573,19 @@ public class VehicleExitController {
          * Generates a formatted payment summary display.
          */
         public String getDisplayText() {
+            java.time.format.DateTimeFormatter timeFormatter = 
+                java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+            
             StringBuilder sb = new StringBuilder();
             sb.append("=== PAYMENT SUMMARY ===\n");
             sb.append("License Plate: ").append(vehicle.getLicensePlate()).append("\n");
+            sb.append("Vehicle Type: ").append(vehicle.getType()).append("\n");
             sb.append("Card Holder: ").append(vehicle.isHandicapped() ? "YES" : "NO").append("\n");
             sb.append("Spot: ").append(spot.getSpotId()).append("\n");
-            sb.append("Entry Time: ").append(vehicle.getEntryTime()).append("\n");
-            sb.append("Exit Time: ").append(vehicle.getExitTime()).append("\n");
+            sb.append("Spot Type: ").append(spot.getType()).append("\n");
+            sb.append("Spot Rate: RM ").append(String.format("%.2f", spot.getHourlyRate())).append("/hr\n");
+            sb.append("Entry Time: ").append(vehicle.getEntryTime().format(timeFormatter)).append("\n");
+            sb.append("Exit Time: ").append(vehicle.getExitTime().format(timeFormatter)).append("\n");
             sb.append("-----------------------\n");
             sb.append("Hours Parked: ").append(durationHours).append("\n");
             

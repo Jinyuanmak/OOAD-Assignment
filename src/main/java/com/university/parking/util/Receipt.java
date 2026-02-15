@@ -4,6 +4,8 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
 import com.university.parking.model.PaymentMethod;
+import com.university.parking.model.SpotType;
+import com.university.parking.model.VehicleType;
 
 /**
  * Represents a payment receipt containing all transaction details.
@@ -27,15 +29,18 @@ public class Receipt {
     private boolean isPrepaidReservation;
     private boolean isWithinGracePeriod;
     private boolean isCardHolder;
+    private VehicleType vehicleType;
+    private SpotType spotType;
+    private double spotRate;
 
     private static final DateTimeFormatter DATE_FORMATTER = 
-        DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
     public Receipt(String licensePlate, LocalDateTime entryTime, LocalDateTime exitTime,
                    long durationHours, double parkingFee, double fineAmount,
                    double amountPaid, PaymentMethod paymentMethod, String spotId) {
         this(licensePlate, entryTime, exitTime, durationHours, parkingFee, fineAmount, 
-             amountPaid, paymentMethod, spotId, false, false, false);
+             amountPaid, paymentMethod, spotId, false, false, false, null, null, 0.0);
     }
 
     public Receipt(String licensePlate, LocalDateTime entryTime, LocalDateTime exitTime,
@@ -43,7 +48,7 @@ public class Receipt {
                    double amountPaid, PaymentMethod paymentMethod, String spotId, 
                    boolean isPrepaidReservation) {
         this(licensePlate, entryTime, exitTime, durationHours, parkingFee, fineAmount, 
-             amountPaid, paymentMethod, spotId, isPrepaidReservation, false, false);
+             amountPaid, paymentMethod, spotId, isPrepaidReservation, false, false, null, null, 0.0);
     }
 
     public Receipt(String licensePlate, LocalDateTime entryTime, LocalDateTime exitTime,
@@ -51,13 +56,22 @@ public class Receipt {
                    double amountPaid, PaymentMethod paymentMethod, String spotId, 
                    boolean isPrepaidReservation, boolean isWithinGracePeriod) {
         this(licensePlate, entryTime, exitTime, durationHours, parkingFee, fineAmount, 
-             amountPaid, paymentMethod, spotId, isPrepaidReservation, isWithinGracePeriod, false);
+             amountPaid, paymentMethod, spotId, isPrepaidReservation, isWithinGracePeriod, false, null, null, 0.0);
     }
 
     public Receipt(String licensePlate, LocalDateTime entryTime, LocalDateTime exitTime,
                    long durationHours, double parkingFee, double fineAmount,
                    double amountPaid, PaymentMethod paymentMethod, String spotId, 
                    boolean isPrepaidReservation, boolean isWithinGracePeriod, boolean isCardHolder) {
+        this(licensePlate, entryTime, exitTime, durationHours, parkingFee, fineAmount, 
+             amountPaid, paymentMethod, spotId, isPrepaidReservation, isWithinGracePeriod, isCardHolder, null, null, 0.0);
+    }
+
+    public Receipt(String licensePlate, LocalDateTime entryTime, LocalDateTime exitTime,
+                   long durationHours, double parkingFee, double fineAmount,
+                   double amountPaid, PaymentMethod paymentMethod, String spotId, 
+                   boolean isPrepaidReservation, boolean isWithinGracePeriod, boolean isCardHolder,
+                   VehicleType vehicleType, SpotType spotType, double spotRate) {
         this.licensePlate = licensePlate;
         this.entryTime = entryTime;
         this.exitTime = exitTime;
@@ -74,6 +88,9 @@ public class Receipt {
         this.isPrepaidReservation = isPrepaidReservation;
         this.isWithinGracePeriod = isWithinGracePeriod;
         this.isCardHolder = isCardHolder;
+        this.vehicleType = vehicleType;
+        this.spotType = spotType;
+        this.spotRate = spotRate;
     }
 
     /**
@@ -92,8 +109,17 @@ public class Receipt {
         
         // Vehicle Information
         receipt.append("License Plate : ").append(licensePlate).append("\n");
+        if (vehicleType != null) {
+            receipt.append("Vehicle Type  : ").append(vehicleType).append("\n");
+        }
         receipt.append("Card Holder   : ").append(isCardHolder ? "YES" : "NO").append("\n");
         receipt.append("Parking Spot  : ").append(spotId).append("\n");
+        if (spotType != null) {
+            receipt.append("Spot Type     : ").append(spotType).append("\n");
+        }
+        if (spotRate > 0) {
+            receipt.append("Spot Rate     : RM ").append(String.format("%.2f", spotRate)).append("/hr\n");
+        }
         receipt.append("\n");
         
         // Parking Duration
@@ -208,6 +234,18 @@ public class Receipt {
 
     public boolean isCardHolder() {
         return isCardHolder;
+    }
+
+    public VehicleType getVehicleType() {
+        return vehicleType;
+    }
+
+    public SpotType getSpotType() {
+        return spotType;
+    }
+
+    public double getSpotRate() {
+        return spotRate;
     }
 
     @Override
