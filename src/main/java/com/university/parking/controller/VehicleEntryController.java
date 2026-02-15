@@ -306,6 +306,7 @@ public class VehicleEntryController {
             sb.append("Ticket Number: ").append(ticketNumber).append("\n");
             sb.append("License Plate: ").append(vehicle.getLicensePlate()).append("\n");
             sb.append("Vehicle Type: ").append(vehicle.getType()).append("\n");
+            sb.append("Card Holder: ").append(vehicle.isHandicapped() ? "YES" : "NO").append("\n");
             sb.append("Spot Location: ").append(spot.getSpotId()).append("\n");
             sb.append("Spot Type: ").append(spot.getType()).append("\n");
             sb.append("Hourly Rate: RM ").append(String.format("%.2f", spot.getHourlyRate())).append("\n");

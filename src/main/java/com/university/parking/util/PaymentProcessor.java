@@ -96,7 +96,7 @@ public class PaymentProcessor {
                                          double amountPaid, PaymentMethod paymentMethod,
                                          String spotId) {
         return generateReceipt(licensePlate, entryTime, exitTime, durationHours,
-                              parkingFee, fineAmount, amountPaid, paymentMethod, spotId, false, false);
+                              parkingFee, fineAmount, amountPaid, paymentMethod, spotId, false, false, false);
     }
 
     /**
@@ -121,7 +121,7 @@ public class PaymentProcessor {
                                          String spotId, boolean isPrepaidReservation) {
         return generateReceipt(licensePlate, entryTime, exitTime, durationHours,
                               parkingFee, fineAmount, amountPaid, paymentMethod, spotId, 
-                              isPrepaidReservation, false);
+                              isPrepaidReservation, false, false);
     }
 
     /**
@@ -138,6 +138,7 @@ public class PaymentProcessor {
      * @param spotId the parking spot ID
      * @param isPrepaidReservation whether this is a prepaid reservation
      * @param isWithinGracePeriod whether this is within 15-minute grace period
+     * @param isCardHolder whether the vehicle has handicapped card holder status
      * @return a Receipt object containing all transaction details
      */
     public static Receipt generateReceipt(String licensePlate, LocalDateTime entryTime,
@@ -145,10 +146,10 @@ public class PaymentProcessor {
                                          double parkingFee, double fineAmount,
                                          double amountPaid, PaymentMethod paymentMethod,
                                          String spotId, boolean isPrepaidReservation,
-                                         boolean isWithinGracePeriod) {
+                                         boolean isWithinGracePeriod, boolean isCardHolder) {
         return new Receipt(licensePlate, entryTime, exitTime, durationHours,
                           parkingFee, fineAmount, amountPaid, paymentMethod, spotId, 
-                          isPrepaidReservation, isWithinGracePeriod);
+                          isPrepaidReservation, isWithinGracePeriod, isCardHolder);
     }
 
     /**

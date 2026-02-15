@@ -124,7 +124,7 @@ public class ModernEntryPanel extends BasePanel {
         // Handicapped checkbox
         gbc.gridx = 0; gbc.gridy = 4;
         gbc.gridwidth = 2;
-        handicappedCheckbox = new JCheckBox("Handicapped Vehicle");
+        handicappedCheckbox = new JCheckBox("Handicapped Card Holder");
         handicappedCheckbox.setFont(ThemeManager.FONT_BODY);
         handicappedCheckbox.setForeground(ThemeManager.TEXT_PRIMARY);
         handicappedCheckbox.setBackground(ThemeManager.BG_WHITE);

@@ -162,13 +162,14 @@ public class VehicleExitPanel extends BasePanel {
             // Check if this is grace period or prepaid reservation
             boolean isZeroPaymentExit = currentSummary.isWithinGracePeriod() || currentSummary.hasPrepaidReservation();
             
-            if (isZeroPaymentExit) {
-                // Lock payment amount field for grace period or prepaid reservation
+            // Only lock if zero payment AND no fines
+            if (isZeroPaymentExit && currentSummary.getTotalDue() == 0.0) {
+                // Lock payment amount field for grace period or prepaid reservation with no fines
                 paymentAmountField.setText("0.00");
                 paymentAmountField.setEditable(false);
                 paymentAmountField.setEnabled(false);
             } else {
-                // Unlock payment amount field for normal exits
+                // Unlock payment amount field for normal exits or exits with fines
                 paymentAmountField.setEditable(true);
                 paymentAmountField.setEnabled(true);
                 paymentAmountField.setText(String.format("%.2f", currentSummary.getTotalDue()));
@@ -197,8 +198,8 @@ public class VehicleExitPanel extends BasePanel {
         PaymentMethod paymentMethod = (PaymentMethod) paymentMethodCombo.getSelectedItem();
         String licensePlate = licensePlateField.getText().trim().toUpperCase();
         
-        // Special handling for grace period exits
-        if (currentSummary.isWithinGracePeriod()) {
+        // Special handling for grace period exits (only if no fines)
+        if (currentSummary.isWithinGracePeriod() && currentSummary.getTotalDue() == 0.0) {
             if (paymentMethod == PaymentMethod.CARD) {
                 // CARD payment: No amount needed, can exit with RM 0.00
                 processGracePeriodExit(licensePlate, 0.0, paymentMethod);
@@ -210,8 +211,8 @@ public class VehicleExitPanel extends BasePanel {
             }
         }
         
-        // Special handling for prepaid reservations with CASH payment
-        if (currentSummary.hasPrepaidReservation() && paymentMethod == PaymentMethod.CASH) {
+        // Special handling for prepaid reservations with CASH payment (only if no fines)
+        if (currentSummary.hasPrepaidReservation() && currentSummary.getTotalDue() == 0.0 && paymentMethod == PaymentMethod.CASH) {
             // CASH payment for prepaid reservation: Must insert cash, then refund
             processPrepaidReservationCashPayment(licensePlate);
             return;
@@ -223,8 +224,9 @@ public class VehicleExitPanel extends BasePanel {
             return;
         }
         
-        // Special case: Allow 0.00 for prepaid reservations with CARD
-        boolean isZeroPaymentAllowed = currentSummary.hasPrepaidReservation();
+        // Special case: Allow 0.00 for prepaid reservations or grace period with CARD (only if no fines)
+        boolean isZeroPaymentAllowed = (currentSummary.hasPrepaidReservation() || currentSummary.isWithinGracePeriod()) 
+                                        && currentSummary.getTotalDue() == 0.0;
         
         if (!isZeroPaymentAllowed && !validatePositiveNumber(amountText, "Payment amount")) {
             return;

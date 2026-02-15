@@ -98,17 +98,46 @@ public class ReservationDAO {
     public List<Reservation> findByLicensePlate(String licensePlate) throws SQLException {
         String sql = "SELECT * FROM reservations WHERE license_plate = ? AND is_active = TRUE ORDER BY start_time DESC";
         
-        List<Reservation> reservations = new ArrayList<>();
         Connection conn = dbManager.getConnection();
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, licensePlate);
             
             try (ResultSet rs = stmt.executeQuery()) {
+                List<Reservation> reservations = new ArrayList<>();
                 while (rs.next()) {
                     reservations.add(mapResultSetToReservation(rs));
                 }
+                return reservations;
             }
-            return reservations;
+        } finally {
+            dbManager.releaseConnection(conn);
+        }
+    }
+
+    /**
+     * Finds the most recent active reservation for a vehicle/spot combination.
+     * This includes expired reservations (past end_time) to check if vehicle overstayed.
+     * @param licensePlate the vehicle's license plate
+     * @param spotId the spot ID
+     * @return the most recent reservation if found, null otherwise
+     * @throws SQLException if database operation fails
+     */
+    public Reservation findMostRecentReservation(String licensePlate, String spotId) throws SQLException {
+        String sql = "SELECT * FROM reservations " +
+                     "WHERE license_plate = ? AND spot_id = ? AND is_active = TRUE " +
+                     "ORDER BY start_time DESC LIMIT 1";
+        
+        Connection conn = dbManager.getConnection();
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, licensePlate);
+            stmt.setString(2, spotId);
+            
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return mapResultSetToReservation(rs);
+                }
+            }
+            return null;
         } finally {
             dbManager.releaseConnection(conn);
         }

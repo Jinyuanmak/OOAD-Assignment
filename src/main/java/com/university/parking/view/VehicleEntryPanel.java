@@ -100,7 +100,7 @@ public class VehicleEntryPanel extends BasePanel {
         // Handicapped checkbox
         gbc.gridx = 0; gbc.gridy = 2;
         gbc.gridwidth = 2;
-        handicappedCheckbox = new JCheckBox("Handicapped Vehicle");
+        handicappedCheckbox = new JCheckBox("Handicapped Card Holder");
         handicappedCheckbox.addActionListener(e -> refreshAvailableSpots());
         panel.add(handicappedCheckbox, gbc);
 

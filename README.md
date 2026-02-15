@@ -8,7 +8,9 @@ A comprehensive parking facility management system built with Java Swing and MyS
 - Vehicle entry with automatic spot assignment
 - Vehicle exit with fee calculation
 - Support for multiple vehicle types (Motorcycle, Car, SUV/Truck, Handicapped)
+- Handicapped card holder discount: RM 2/hour in any spot, FREE in handicapped spots
 - Real-time parking duration tracking
+- Card holder status displayed on entry ticket and exit receipt
 
 ### Parking Spot Management
 - Multi-floor parking structure
@@ -19,29 +21,41 @@ A comprehensive parking facility management system built with Java Swing and MyS
 ### Fine Management
 - Automatic fine issuance for overstay (>24 hours)
 - Automatic fine for unauthorized reserved spot parking (RM 100)
+- Automatic fine for expired reservations (RM 100)
 - Multiple fine calculation strategies:
   - Fixed: RM 50 flat fine
-  - Hourly: RM 10 per hour
-  - Progressive: RM 50 base + RM 10 per hour
+  - Hourly: RM 20 per hour
+  - Progressive: Tiered by days
+    - Day 2 (24-48h): RM 50
+    - Day 3 (48-72h): +RM 100 (Total: RM 150)
+    - Day 4 (72-96h): +RM 150 (Total: RM 300)
+    - Day 5+ (96h+): +RM 200 (Total: RM 500)
 - Fine payment tracking
 - Unpaid balance tracking across sessions
+- Detailed fine breakdown by type in exit summary
 
 ### Reservation System
 - Reserve specific RESERVED parking spots in advance
+- Prepaid payment: Pay upfront for entire reservation period (RM 10/hour × 24 hours = RM 240)
 - Set reservation time windows (start and end times)
+- Multiple entry/exit allowed within reservation period
 - Validation during vehicle entry
 - Automatic RM 100 fine for unauthorized reserved spot usage
+- Expired reservation fine: RM 100 if vehicle stays beyond reservation period
+- Overstay fine: Additional fine if vehicle exceeds 24 hours total parking time
 - View and manage all reservations
-- Cancel reservations when needed
+- Cancel reservations when needed (no refund policy)
 
 **How to Use**:
 1. Navigate to "Reservations" panel
 2. Enter license plate and reserved spot ID
 3. Set duration in hours (default: 24 hours)
-4. Click "Create Reservation"
-5. Vehicle must enter within the reservation time window
-6. If correct vehicle enters → No fine, normal parking rate (RM 10/hr for RESERVED spots)
-7. If wrong vehicle enters → RM 100 fine issued automatically
+4. Pay prepaid amount upfront (e.g., 24 hours × RM 10 = RM 240)
+5. Click "Create Reservation"
+6. Vehicle can enter/exit multiple times within reservation period
+7. If correct vehicle enters → No additional charges (prepaid)
+8. If wrong vehicle enters → RM 100 fine issued automatically
+9. If vehicle stays beyond reservation → RM 100 expired reservation fine + overstay fine
 
 ### Payment Processing
 - Multiple payment methods: Cash, Credit Card, Debit Card, E-Wallet, Online Banking
@@ -134,7 +148,7 @@ src/main/java/com/university/parking/
 1. Navigate to "Vehicle Entry" panel
 2. Enter license plate number
 3. Select vehicle type
-4. Check "Handicapped" if applicable
+4. Check "Handicapped Card Holder" if applicable (enables discount: FREE in handicapped spots, RM 2/hr in other spots)
 5. Click "Park Vehicle"
 6. System assigns available spot automatically
 
@@ -188,7 +202,7 @@ Modify in `ParkingApplication.java` to customize.
 ### Hourly Rates
 - Compact: RM 2.00/hour
 - Regular: RM 5.00/hour
-- Handicapped: RM 2.00/hour
+- Handicapped: FREE (RM 0.00/hour) for handicapped card holders in handicapped spots, RM 2.00/hour for card holders in other spots, RM 5.00/hour for non-card holders
 - Reserved: RM 10.00/hour
 
 Modify in `SpotType.java` enum.
@@ -199,8 +213,12 @@ Modify in `SpotType.java` enum.
 
 **Available Strategies**:
 1. **Fixed**: RM 50 flat fine regardless of overstay duration
-2. **Hourly**: RM 10 per hour of overstay
-3. **Progressive**: RM 50 base fine + RM 10 per hour of overstay
+2. **Hourly**: RM 20 per hour of overstay
+3. **Progressive**: Tiered by days (based on total parking hours)
+   - Day 2 (24-48 hours): RM 50
+   - Day 3 (48-72 hours): RM 150 (RM 50 + RM 100)
+   - Day 4 (72-96 hours): RM 300 (RM 50 + RM 100 + RM 150)
+   - Day 5+ (96+ hours): RM 500 (RM 50 + RM 100 + RM 150 + RM 200)
 
 Change strategy via Admin panel. Strategy changes only affect new entries after the change time.
 

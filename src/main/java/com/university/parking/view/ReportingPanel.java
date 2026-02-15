@@ -293,7 +293,7 @@ public class ReportingPanel extends BasePanel {
         if (strategy instanceof FixedFineStrategy) {
             sb.append("Fixed (RM 50)\n");
         } else if (strategy instanceof ProgressiveFineStrategy) {
-            sb.append("Progressive (RM 50 + escalating)\n");
+            sb.append("Progressive (Tiered: RM 50/100/150/200)\n");
         } else if (strategy instanceof HourlyFineStrategy) {
             sb.append("Hourly (RM 20/hour)\n");
         } else {

@@ -26,6 +26,7 @@ public class Receipt {
     private String spotId;
     private boolean isPrepaidReservation;
     private boolean isWithinGracePeriod;
+    private boolean isCardHolder;
 
     private static final DateTimeFormatter DATE_FORMATTER = 
         DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
@@ -34,7 +35,7 @@ public class Receipt {
                    long durationHours, double parkingFee, double fineAmount,
                    double amountPaid, PaymentMethod paymentMethod, String spotId) {
         this(licensePlate, entryTime, exitTime, durationHours, parkingFee, fineAmount, 
-             amountPaid, paymentMethod, spotId, false, false);
+             amountPaid, paymentMethod, spotId, false, false, false);
     }
 
     public Receipt(String licensePlate, LocalDateTime entryTime, LocalDateTime exitTime,
@@ -42,13 +43,21 @@ public class Receipt {
                    double amountPaid, PaymentMethod paymentMethod, String spotId, 
                    boolean isPrepaidReservation) {
         this(licensePlate, entryTime, exitTime, durationHours, parkingFee, fineAmount, 
-             amountPaid, paymentMethod, spotId, isPrepaidReservation, false);
+             amountPaid, paymentMethod, spotId, isPrepaidReservation, false, false);
     }
 
     public Receipt(String licensePlate, LocalDateTime entryTime, LocalDateTime exitTime,
                    long durationHours, double parkingFee, double fineAmount,
                    double amountPaid, PaymentMethod paymentMethod, String spotId, 
                    boolean isPrepaidReservation, boolean isWithinGracePeriod) {
+        this(licensePlate, entryTime, exitTime, durationHours, parkingFee, fineAmount, 
+             amountPaid, paymentMethod, spotId, isPrepaidReservation, isWithinGracePeriod, false);
+    }
+
+    public Receipt(String licensePlate, LocalDateTime entryTime, LocalDateTime exitTime,
+                   long durationHours, double parkingFee, double fineAmount,
+                   double amountPaid, PaymentMethod paymentMethod, String spotId, 
+                   boolean isPrepaidReservation, boolean isWithinGracePeriod, boolean isCardHolder) {
         this.licensePlate = licensePlate;
         this.entryTime = entryTime;
         this.exitTime = exitTime;
@@ -64,6 +73,7 @@ public class Receipt {
         this.spotId = spotId;
         this.isPrepaidReservation = isPrepaidReservation;
         this.isWithinGracePeriod = isWithinGracePeriod;
+        this.isCardHolder = isCardHolder;
     }
 
     /**
@@ -82,6 +92,7 @@ public class Receipt {
         
         // Vehicle Information
         receipt.append("License Plate : ").append(licensePlate).append("\n");
+        receipt.append("Card Holder   : ").append(isCardHolder ? "YES" : "NO").append("\n");
         receipt.append("Parking Spot  : ").append(spotId).append("\n");
         receipt.append("\n");
         
@@ -193,6 +204,10 @@ public class Receipt {
 
     public boolean isWithinGracePeriod() {
         return isWithinGracePeriod;
+    }
+
+    public boolean isCardHolder() {
+        return isCardHolder;
     }
 
     @Override

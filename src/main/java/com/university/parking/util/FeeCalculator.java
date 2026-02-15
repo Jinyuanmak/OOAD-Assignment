@@ -6,14 +6,17 @@ import com.university.parking.model.Vehicle;
 
 /**
  * Fee calculation engine for the parking system.
- * Handles basic parking fee calculation and handicapped vehicle pricing logic.
+ * Handles basic parking fee calculation and handicapped card holder pricing logic.
  */
 public class FeeCalculator {
 
     /**
      * Calculates the parking fee for a vehicle based on duration and spot type.
      * Implements basic fee calculation: duration × hourly rate
-     * Applies handicapped vehicle pricing logic as per requirements 7.1 and 7.2.
+     * Applies handicapped card holder pricing logic as per requirements 7.1 and 7.2.
+     * 
+     * Card holders in handicapped spots park for FREE (RM 0/hour).
+     * Card holders in other spots get RM 2/hour discounted rate.
      * 
      * @param vehicle the vehicle that parked
      * @param spot the parking spot where the vehicle parked
@@ -31,21 +34,27 @@ public class FeeCalculator {
 
     /**
      * Determines the applicable hourly rate based on vehicle and spot type.
-     * Implements handicapped vehicle pricing logic:
-     * - Handicapped vehicle in handicapped spot: RM 2/hour
-     * - Handicapped vehicle in non-handicapped spot: standard spot rate
+     * Implements handicapped card holder pricing logic:
+     * - ANY vehicle type WITH card holder in HANDICAPPED spot: FREE (RM 0/hour)
+     * - ANY vehicle type WITH card holder in other spots: RM 2/hour (discounted rate)
+     * - ANY vehicle type WITHOUT card holder: standard spot rate
      * 
      * @param vehicle the vehicle
      * @param spot the parking spot
      * @return the applicable hourly rate in RM
      */
     private static double getApplicableHourlyRate(Vehicle vehicle, ParkingSpot spot) {
-        // Requirement 7.1: Handicapped vehicle in handicapped spot charges RM 2/hour
+        // Card holder in handicapped spot: FREE
         if (vehicle.isHandicapped() && spot.getType() == SpotType.HANDICAPPED) {
-            return 2.0;
+            return 0.0;  // FREE for card holders in handicapped spots
         }
         
-        // Requirement 7.2: Handicapped vehicle in non-handicapped spot charges standard rate
+        // Card holder in other spots: RM 2/hour discounted rate
+        if (vehicle.isHandicapped()) {
+            return 2.0;  // RM 2/hour discounted rate for card holders in non-handicapped spots
+        }
+        
+        // All other cases: standard spot rate
         return spot.getHourlyRate();
     }
 

@@ -3,9 +3,8 @@
 ## Table of Contents
 1. [Class Diagram](#class-diagram)
 2. [Sequence Diagrams](#sequence-diagrams)
-3. [State Diagram](#state-diagram)
-4. [Use Case Diagram](#use-case-diagram)
-5. [Architecture Overview](#architecture-overview)
+3. [Use Case Diagram](#use-case-diagram)
+4. [Architecture Overview](#architecture-overview)
 
 ---
 
@@ -192,10 +191,13 @@ classDiagram
     }
     
     class ProgressiveFineStrategy {
-        -double BASE_FINE = 20.0
-        -double ADDITIONAL_RATE = 5.0
+        -double DAY2_FINE = 50.0
+        -double DAY3_ADDITIONAL = 100.0
+        -double DAY4_ADDITIONAL = 150.0
+        -double DAY5_ADDITIONAL = 200.0
         +calculateFine(long) double
         +getStrategyName() String
+        +getTierDescription() String
     }
     
     class FineCalculationContext {
@@ -344,8 +346,9 @@ classDiagram
 ```mermaid
 classDiagram
     class FeeCalculator {
-        +calculateFee(ParkingSpot, LocalDateTime, LocalDateTime)$ double
-        +calculateDuration(LocalDateTime, LocalDateTime)$ long
+        +calculateParkingFee(Vehicle, ParkingSpot, long)$ double
+        +getApplicableHourlyRate(Vehicle, ParkingSpot)$ double
+        +calculateTotalAmount(double, double)$ double
     }
     
     class FineManager {
@@ -809,46 +812,90 @@ sequenceDiagram
     end
 ```
 
----
-
-## State Diagrams
-
-### Parking Spot State Diagram
+### 8. Handicapped Card Holder Discount Flow
 
 ```mermaid
-stateDiagram-v2
-    [*] --> AVAILABLE
-    AVAILABLE --> OCCUPIED : occupySpot(vehicle)
-    OCCUPIED --> AVAILABLE : vacateSpot()
-    AVAILABLE --> MAINTENANCE : markForMaintenance()
-    MAINTENANCE --> AVAILABLE : completeMaintenance()
-    AVAILABLE --> RESERVED : reserve()
-    RESERVED --> AVAILABLE : cancelReservation()
+sequenceDiagram
+    actor Driver
+    participant EntryPanel
+    participant VehicleEntryController
+    participant FeeCalculator
+    participant ExitController
+    
+    Driver->>EntryPanel: Enter vehicle info
+    Driver->>EntryPanel: Check "Handicapped Card Holder"
+    EntryPanel->>VehicleEntryController: processEntry(plate, type, isHandicapped=true, spotId)
+    VehicleEntryController->>VehicleEntryController: Create Vehicle(isHandicapped=true)
+    VehicleEntryController-->>EntryPanel: Ticket shows "Card Holder: YES"
+    
+    Note over Driver: Vehicle parks and exits
+    
+    Driver->>ExitController: Request exit
+    ExitController->>FeeCalculator: calculateParkingFee(vehicle, spot, hours)
+    
+    alt Handicapped Spot
+        FeeCalculator-->>ExitController: RM 0/hour (FREE)
+    else Other Spots (COMPACT, REGULAR, RESERVED)
+        FeeCalculator-->>ExitController: RM 2/hour (discounted)
+    end
+    
+    ExitController-->>Driver: Summary shows "Card Holder: YES" + discounted rate
 ```
 
-### Vehicle Parking Session State Diagram
+### 9. Expired Reservation with Overstay Fine
 
 ```mermaid
-stateDiagram-v2
-    [*] --> ENTERED : Vehicle enters
-    ENTERED --> PARKED : Entry time recorded
-    PARKED --> OVERSTAY : time > 24 hours
-    PARKED --> EXITING : processExit()
-    OVERSTAY --> EXITING : processExit()
-    EXITING --> PAYMENT_PROCESSING : Calculate charges
-    PAYMENT_PROCESSING --> EXITED : Payment successful
-    EXITED --> [*]
+sequenceDiagram
+    actor Driver
+    participant ExitController
+    participant ReservationDAO
+    participant FineManager
+    participant FeeCalculator
+    
+    Driver->>ExitController: Request exit (26 hours after entry)
+    ExitController->>ReservationDAO: findValidReservation(plate, spot, exitTime)
+    ReservationDAO-->>ExitController: null (reservation expired 2 hours ago)
+    
+    ExitController->>ReservationDAO: findMostRecentReservation(plate, spot)
+    ReservationDAO-->>ExitController: Reservation (ended 2 hours ago)
+    
+    ExitController->>ExitController: Check if reservation expired
+    Note over ExitController: exitTime > reservation.endTime = true
+    
+    ExitController->>FineManager: Issue UNAUTHORIZED_RESERVED fine
+    FineManager-->>ExitController: Fine(RM 100)
+    
+    ExitController->>FineManager: Check for overstay (26 hours > 24)
+    FineManager->>FeeCalculator: Calculate overstay fine (FIXED strategy)
+    FeeCalculator-->>FineManager: Fine(RM 50)
+    FineManager-->>ExitController: Fine(RM 50)
+    
+    ExitController-->>Driver: Summary shows:<br/>- Expired Reservation: RM 100<br/>- Overstay Fine: RM 50<br/>Total: RM 150
 ```
 
-### Fine State Diagram
+### 10. Progressive Fine Calculation (Tiered by Days)
 
 ```mermaid
-stateDiagram-v2
-    [*] --> ISSUED : Fine issued
-    ISSUED --> PAID : payFine()
-    ISSUED --> UNPAID : time passes
-    UNPAID --> PAID : payFine()
-    PAID --> [*]
+sequenceDiagram
+    actor Driver
+    participant ExitController
+    participant FineManager
+    participant ProgressiveFineStrategy
+    
+    Driver->>ExitController: Request exit (75 hours parked)
+    ExitController->>FineManager: Check for overstay (75 hours > 24)
+    FineManager->>ProgressiveFineStrategy: calculateFine(75 hours)
+    
+    Note over ProgressiveFineStrategy: Calculate tier:<br/>75 hours = Day 4 (72-96 hours)
+    
+    ProgressiveFineStrategy->>ProgressiveFineStrategy: Day 2 fine: RM 50
+    ProgressiveFineStrategy->>ProgressiveFineStrategy: Day 3 additional: RM 100
+    ProgressiveFineStrategy->>ProgressiveFineStrategy: Day 4 additional: RM 150
+    ProgressiveFineStrategy->>ProgressiveFineStrategy: Total: RM 300
+    
+    ProgressiveFineStrategy-->>FineManager: Fine(RM 300)
+    FineManager-->>ExitController: Fine(RM 300)
+    ExitController-->>Driver: Summary shows:<br/>- Overstay Fine: RM 300<br/>(Progressive - Day 4)
 ```
 
 ---
@@ -1068,9 +1115,9 @@ graph TB
     subgraph Strategy Pattern
         Context[FineCalculationContext]
         Interface[FineCalculationStrategy Interface]
-        Fixed[FixedFineStrategy<br/>50 RM flat]
-        Hourly[HourlyFineStrategy<br/>10 RM per hour]
-        Progressive[ProgressiveFineStrategy<br/>20 RM base + 5 RM per hour]
+        Fixed[FixedFineStrategy<br/>RM 50 flat]
+        Hourly[HourlyFineStrategy<br/>RM 20 per hour]
+        Progressive[ProgressiveFineStrategy<br/>Tiered by Days:<br/>Day 2: RM 50<br/>Day 3: +RM 100<br/>Day 4: +RM 150<br/>Day 5+: +RM 200]
         
         Context -->|uses| Interface
         Interface <|..|implements| Fixed
@@ -1173,3 +1220,49 @@ Key design patterns implemented:
 - **If Vehicle Never Enters**: Reservation remains valid, prepaid amount already collected, spot remains available for other vehicles
 - **Expiration**: After end time, reservation status shows "EXPIRED" but remains in database for record-keeping
 - **No Entry Required**: System does not require vehicle to physically enter to maintain reservation validity
+
+### 9. Progressive Fine Strategy (Updated Calculation)
+- **Tiered by Days** (based on total parking hours):
+  - **Day 1 (0-24 hours)**: No fine (normal parking)
+  - **Day 2 (24-48 hours)**: RM 50 fine (1st day overstay)
+  - **Day 3 (48-72 hours)**: Additional RM 100 (Total: RM 150)
+  - **Day 4 (72-96 hours)**: Additional RM 150 (Total: RM 300)
+  - **Day 5+ (96+ hours)**: Additional RM 200 (Total: RM 500 maximum)
+- **Example**: Vehicle parked for 75 hours = RM 300 fine (Day 2 + Day 3 + Day 4)
+
+### 10. Handicapped Card Holder Discount
+- **Card Holder Status**: Tracked via `is_handicapped` field (boolean)
+- **Checkbox Label**: "Handicapped Card Holder" in entry panels
+- **Pricing Rules**:
+  - **In HANDICAPPED spot**: FREE (RM 0/hour) - regardless of vehicle type
+  - **In other spots** (COMPACT, REGULAR, RESERVED): RM 2/hour (discounted rate)
+  - **Without card holder**: Normal spot rate applies
+- **Display**: Entry ticket and exit receipt show "Card Holder: YES/NO"
+- **Example**: Card holder in RESERVED spot for 1 hour = RM 2 parking fee (+ RM 100 fine if unauthorized)
+
+### 11. Expired Reservation with Overstay Fine
+- **Scenario**: Vehicle has valid reservation but stays beyond reservation period
+- **Fine Calculation**:
+  - **Expired Reservation Fine**: RM 100 (UNAUTHORIZED_RESERVED) - issued when reservation expires
+  - **Overstay Fine**: Calculated using current fine strategy (e.g., FIXED = RM 50)
+  - **Total**: Both fines are applied
+- **Example**: 24-hour reservation, vehicle stays 26 hours
+  - Parking Fee: RM 0 (prepaid covered valid period)
+  - Expired Reservation Fine: RM 100
+  - Overstay Fine: RM 50 (FIXED strategy, 26 hours > 24 hours)
+  - **Total Due: RM 150**
+- **Detection**: System checks for most recent reservation and validates against exit time
+
+### 12. Fine Display Enhancement
+- **Specific Fine Types**: Exit summary now shows individual fines by type instead of generic "Unpaid Fines"
+- **Display Format**:
+  ```
+  Fines:
+    - Overstay Fine: RM 50.00
+    - Unauthorized Reserved Spot: RM 100.00
+  Total Fines: RM 150.00
+  ```
+- **Fine Type Labels**:
+  - `OVERSTAY` → "Overstay Fine"
+  - `UNAUTHORIZED_RESERVED` → "Unauthorized Reserved Spot"
+  - `UNPAID_BALANCE` → "Unpaid Balance"

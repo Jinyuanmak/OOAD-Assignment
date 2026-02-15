@@ -13,6 +13,7 @@ import com.university.parking.dao.PaymentDAO;
 import com.university.parking.dao.ReservationDAO;
 import com.university.parking.dao.VehicleDAO;
 import com.university.parking.model.Fine;
+import com.university.parking.model.FineType;
 import com.university.parking.model.ParkingLot;
 import com.university.parking.model.ParkingSpot;
 import com.university.parking.model.Payment;
@@ -163,8 +164,10 @@ public class VehicleExitController {
         // Check for valid prepaid reservation first
         boolean hasPrepaidReservation = false;
         Reservation validReservation = null;
+        Reservation anyReservation = null;
         if (reservationDAO != null) {
             try {
+                // Check for currently valid reservation
                 validReservation = reservationDAO.findValidReservation(
                     licensePlate.trim().toUpperCase(), 
                     spot.getSpotId(), 
@@ -173,9 +176,31 @@ public class VehicleExitController {
                 if (validReservation != null) {
                     hasPrepaidReservation = true;
                 }
+                
+                // Also check for any reservation (including expired ones)
+                anyReservation = reservationDAO.findMostRecentReservation(
+                    licensePlate.trim().toUpperCase(),
+                    spot.getSpotId()
+                );
             } catch (SQLException e) {
                 System.err.println("Warning: Failed to check for reservation: " + e.getMessage());
             }
+        }
+        
+        // Check if vehicle had a reservation but it expired
+        boolean hasExpiredReservation = (anyReservation != null && !anyReservation.isValidAt(exitTime));
+        
+        // If reservation expired and vehicle is in RESERVED spot, issue unauthorized fine
+        if (hasExpiredReservation && spot.getType() == SpotType.RESERVED) {
+            Fine expiredReservationFine = new Fine(
+                licensePlate.trim().toUpperCase(),
+                FineType.UNAUTHORIZED_RESERVED,
+                100.0
+            );
+            if (unpaidFinesList == null) {
+                unpaidFinesList = new ArrayList<>();
+            }
+            unpaidFinesList.add(expiredReservationFine);
         }
         
         // Check for 15-minute grace period (U-turn)
@@ -266,7 +291,8 @@ public class VehicleExitController {
             paymentMethod,
             summary.getSpot().getSpotId(),
             summary.hasPrepaidReservation(),
-            summary.isWithinGracePeriod()
+            summary.isWithinGracePeriod(),
+            summary.getVehicle().isHandicapped()
         );
 
         // Mark spot as available (Requirement 4.7)
@@ -547,6 +573,7 @@ public class VehicleExitController {
             StringBuilder sb = new StringBuilder();
             sb.append("=== PAYMENT SUMMARY ===\n");
             sb.append("License Plate: ").append(vehicle.getLicensePlate()).append("\n");
+            sb.append("Card Holder: ").append(vehicle.isHandicapped() ? "YES" : "NO").append("\n");
             sb.append("Spot: ").append(spot.getSpotId()).append("\n");
             sb.append("Entry Time: ").append(vehicle.getEntryTime()).append("\n");
             sb.append("Exit Time: ").append(vehicle.getExitTime()).append("\n");
@@ -561,11 +588,39 @@ public class VehicleExitController {
                 sb.append("Parking Fee: RM ").append(String.format("%.2f", parkingFee)).append("\n");
             }
             
-            sb.append("Unpaid Fines: RM ").append(String.format("%.2f", totalFines)).append("\n");
+            // Display fines by type
+            if (totalFines > 0 && unpaidFines != null && !unpaidFines.isEmpty()) {
+                sb.append("\nFines:\n");
+                for (Fine fine : unpaidFines) {
+                    String fineLabel = getFineTypeLabel(fine.getType());
+                    sb.append("  - ").append(fineLabel).append(": RM ")
+                      .append(String.format("%.2f", fine.getAmount())).append("\n");
+                }
+                sb.append("Total Fines: RM ").append(String.format("%.2f", totalFines)).append("\n");
+            } else {
+                sb.append("Fines: RM 0.00\n");
+            }
+            
             sb.append("-----------------------\n");
             sb.append("TOTAL DUE: RM ").append(String.format("%.2f", totalDue)).append("\n");
             sb.append("=======================");
             return sb.toString();
+        }
+        
+        /**
+         * Gets a human-readable label for a fine type.
+         */
+        private String getFineTypeLabel(FineType type) {
+            switch (type) {
+                case OVERSTAY:
+                    return "Overstay Fine";
+                case UNAUTHORIZED_RESERVED:
+                    return "Unauthorized Reserved Spot";
+                case UNPAID_BALANCE:
+                    return "Unpaid Balance";
+                default:
+                    return "Fine";
+            }
         }
     }
 
