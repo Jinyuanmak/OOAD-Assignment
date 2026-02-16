@@ -301,6 +301,8 @@ public class VehicleEntryController {
          * Requirement 3.5: Display ticket containing spot location and entry time
          */
         public String getTicketDisplay() {
+            DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+            
             StringBuilder sb = new StringBuilder();
             sb.append("=== PARKING TICKET ===\n");
             sb.append("Ticket Number: ").append(ticketNumber).append("\n");
@@ -310,7 +312,7 @@ public class VehicleEntryController {
             sb.append("Spot Location: ").append(spot.getSpotId()).append("\n");
             sb.append("Spot Type: ").append(spot.getType()).append("\n");
             sb.append("Hourly Rate: RM ").append(String.format("%.2f", spot.getHourlyRate())).append("\n");
-            sb.append("Entry Time: ").append(vehicle.getEntryTime()).append("\n");
+            sb.append("Entry Time: ").append(vehicle.getEntryTime().format(timeFormatter)).append("\n");
             
             if (hasUnauthorizedFine()) {
                 sb.append("\n*** WARNING ***\n");
